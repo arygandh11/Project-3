@@ -6,6 +6,13 @@ import { getAllOrders } from '../api/orderApi';
 import type { OrderResponse } from '../api/orderApi';
 import Button from './ui/Button';
 
+/**
+ * Manager View component
+ * Dashboard for managers with three main tabs:
+ * - Inventory: View, add, and update inventory items
+ * - Analytics: View product usage data and sales reports with date range selection
+ * - Orders: View all orders with summary statistics (total revenue, completed/pending counts)
+ */
 function ManagerView() {
   const [activeTab, setActiveTab] = useState<'inventory' | 'analytics' | 'orders'>('inventory');
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -34,6 +41,10 @@ function ManagerView() {
     loadData();
   }, [activeTab]);
 
+  /**
+   * Load data based on the currently active tab
+   * Called when the component mounts or when the active tab changes
+   */
   const loadData = async () => {
     setLoading(true);
     try {
@@ -52,11 +63,18 @@ function ManagerView() {
     }
   };
 
+  /**
+   * Load all inventory items
+   */
   const loadInventory = async () => {
     const items = await getAllInventory();
     setInventory(items);
   };
 
+  /**
+   * Load analytics data (product usage and sales)
+   * Fetches both datasets in parallel for better performance
+   */
   const loadAnalytics = async () => {
     const [usage, sales] = await Promise.all([
       getProductUsageData(),
@@ -66,11 +84,18 @@ function ManagerView() {
     setSalesData({ total: sales.totalSales, period: `${startDate} to ${endDate}` });
   };
 
+  /**
+   * Load all orders
+   */
   const loadOrders = async () => {
     const allOrders = await getAllOrders();
     setOrders(allOrders);
   };
 
+  /**
+   * Add a new inventory item
+   * Validates input and refreshes inventory list after successful addition
+   */
   const handleAddInventory = async () => {
     if (!newItemName.trim() || newItemQuantity < 0) {
       alert('Please enter a valid item name and quantity');
@@ -92,6 +117,10 @@ function ManagerView() {
     }
   };
 
+  /**
+   * Update the quantity of an existing inventory item
+   * @param id - Inventory item ID to update
+   */
   const handleUpdateQuantity = async (id: number) => {
     if (editQuantity < 0) {
       alert('Quantity cannot be negative');
@@ -109,16 +138,28 @@ function ManagerView() {
     }
   };
 
+  /**
+   * Start editing an inventory item
+   * Sets the item to edit mode and initializes the edit quantity
+   * @param item - Inventory item to edit
+   */
   const startEdit = (item: InventoryItem) => {
     setEditingItem(item.ingredientid);
     setEditQuantity(item.ingredientcount);
   };
 
+  /**
+   * Cancel editing and reset edit state
+   */
   const cancelEdit = () => {
     setEditingItem(null);
     setEditQuantity(0);
   };
 
+  /**
+   * Update sales data when date range changes
+   * Validates date range before fetching
+   */
   const handleSalesDateChange = async () => {
     if (startDate && endDate && startDate <= endDate) {
       try {
@@ -131,14 +172,26 @@ function ManagerView() {
     }
   };
 
+  /**
+   * Calculate total revenue from all orders
+   * @returns Sum of all order totals
+   */
   const getTotalRevenue = () => {
     return orders.reduce((sum, order) => sum + Number(order.totalcost), 0);
   };
 
+  /**
+   * Count completed orders
+   * @returns Number of orders marked as complete
+   */
   const getCompletedOrders = () => {
     return orders.filter(order => order.is_complete).length;
   };
 
+  /**
+   * Count pending orders
+   * @returns Number of orders not yet complete
+   */
   const getPendingOrders = () => {
     return orders.filter(order => !order.is_complete).length;
   };
