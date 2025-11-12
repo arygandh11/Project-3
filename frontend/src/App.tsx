@@ -4,6 +4,7 @@ import ManagerView from './components/ManagerView';
 import CashierView from './components/CashierView';
 import CustomerView from './components/CustomerView';
 import MenuBoardView from './components/MenuBoardView';
+import AccessibilityButton from './components/AccessibilityButton';
 
 /**
  * Navigation component
@@ -67,6 +68,7 @@ function App() {
           {/* Catch-all route - redirect unknown paths to home */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <AccessibilityButton />
       </div>
     </Router>
   );
