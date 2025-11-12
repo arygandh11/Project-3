@@ -1,13 +1,26 @@
 import { Link } from 'react-router-dom';
 
+/**
+ * Button component props
+ */
 interface ButtonProps {
-  children: React.ReactNode;
-  to?: string;
-  onClick?: () => void;
-  variant?: 'primary' | 'secondary';
-  style?: React.CSSProperties;
+  children: React.ReactNode; // Button content
+  to?: string; // If provided, renders as a Link instead of button
+  onClick?: () => void; // Click handler (used when to is not provided)
+  variant?: 'primary' | 'secondary'; // Button variant (currently not implemented)
+  style?: React.CSSProperties; // Additional inline styles
 }
 
+/**
+ * Reusable Button component
+ * Can render as either a Link (if 'to' prop is provided) or a button element
+ * Supports custom styling via the style prop
+ * 
+ * @param children - Content to display inside the button
+ * @param to - Optional route path (renders as Link if provided)
+ * @param onClick - Optional click handler (used when to is not provided)
+ * @param style - Optional custom styles to merge with base styles
+ */
 function Button({ children, to, onClick, style }: ButtonProps) {
   const baseStyle: React.CSSProperties = {
     padding: '8px 16px',

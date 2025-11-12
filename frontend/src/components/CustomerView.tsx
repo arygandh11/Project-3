@@ -1,3 +1,14 @@
+/**
+ * Customer View component
+ * Placeholder for the customer-facing ordering interface
+ * 
+ * Future implementation should include:
+ * - Display of menu items organized by category
+ * - Shopping cart functionality
+ * - Order customization options
+ * - Order submission
+ * - Order tracking/status
+ */
 function CustomerView() {
   return (
     <div style={{ padding: '20px', textAlign: 'center', backgroundColor: '#ffffff' }}>
