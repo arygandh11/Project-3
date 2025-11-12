@@ -1,3 +1,14 @@
+/**
+ * Menu Board View component
+ * Placeholder for the public menu board display
+ * 
+ * Future implementation should include:
+ * - Large, readable display of all menu items
+ * - Organization by drink categories
+ * - Price display for each item
+ * - Visual appeal suitable for customer-facing display
+ * - Possibly touch-friendly interface for kiosk use
+ */
 function MenuBoardView() {
   return (
     <div style={{ padding: '20px', textAlign: 'center', backgroundColor: '#ffffff' }}>

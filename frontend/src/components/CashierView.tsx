@@ -5,6 +5,9 @@ import { createOrder, getAllOrders, getOrderItems, markOrderItemComplete } from 
 import type { OrderResponse, OrderItemDetail } from '../api/orderApi';
 import Button from './ui/Button';
 
+/**
+ * Order item structure for the current order being built
+ */
 interface OrderItem {
   menuitemid: number;
   quantity: number;
@@ -12,6 +15,20 @@ interface OrderItem {
   price: number;
 }
 
+/**
+ * Cashier View component
+ * Main interface for cashiers to:
+ * - View and filter menu items by category
+ * - Build orders by adding items with quantities
+ * - Submit orders (validates inventory automatically)
+ * - View and manage incomplete orders
+ * - Mark individual order items as complete
+ * 
+ * Layout: Three-column grid
+ * - Left: Menu items with category filter
+ * - Center: Current order being built
+ * - Right: List of incomplete orders with expandable details
+ */
 function CashierView() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemQuantities, setItemQuantities] = useState<Record<number, number>>({});
@@ -34,6 +51,10 @@ function CashierView() {
     loadIncompleteOrders();
   }, []);
 
+  /**
+   * Load all menu items from the API
+   * Initializes default quantities to 1 for each item
+   */
   const loadMenuItems = async () => {
     try {
       setLoading(true);
@@ -52,6 +73,11 @@ function CashierView() {
     }
   };
 
+  /**
+   * Update the quantity selector for a specific menu item
+   * @param menuitemid - Menu item ID
+   * @param quantity - New quantity value
+   */
   const updateItemQuantity = (menuitemid: number, quantity: number) => {
     setItemQuantities(prev => ({
       ...prev,
@@ -59,6 +85,10 @@ function CashierView() {
     }));
   };
 
+  /**
+   * Load all incomplete orders from the API
+   * Filters out completed orders to show only pending ones
+   */
   const loadIncompleteOrders = async () => {
     try {
       const orders = await getAllOrders();
@@ -69,6 +99,11 @@ function CashierView() {
     }
   };
 
+  /**
+   * Toggle expansion of an order to show/hide its items
+   * Lazy loads order items when first expanded
+   * @param orderId - Order ID to expand/collapse
+   */
   const toggleOrderExpansion = async (orderId: number) => {
     const newExpanded = new Set(expandedOrders);
     if (newExpanded.has(orderId)) {
@@ -100,6 +135,11 @@ function CashierView() {
     setExpandedOrders(newExpanded);
   };
 
+  /**
+   * Mark an order item as complete or incomplete
+   * Updates the order item status and refreshes the incomplete orders list
+   * @param orderItem - Order item to update
+   */
   const handleMarkComplete = async (orderItem: OrderItemDetail) => {
     try {
       await markOrderItemComplete(orderItem.orderitemid, !orderItem.is_complete);
@@ -120,6 +160,11 @@ function CashierView() {
     }
   };
 
+  /**
+   * Add a menu item to the current order
+   * If the item already exists, increments its quantity instead of adding a duplicate
+   * @param menuItem - Menu item to add to the order
+   */
   const addToOrder = (menuItem: MenuItem) => {
     const quantity = itemQuantities[menuItem.menuitemid] || 1;
 
@@ -145,15 +190,27 @@ function CashierView() {
     }
   };
 
+  /**
+   * Clear the current order and reset customer name
+   */
   const clearOrder = () => {
     setCurrentOrder([]);
     setCustomerName('');
   };
 
+  /**
+   * Calculate the total cost of the current order
+   * @returns Total price (sum of all items * quantities)
+   */
   const getTotal = () => {
     return currentOrder.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   };
 
+  /**
+   * Calculate the current week number of the year
+   * Used for order tracking and analytics
+   * @returns Week number (1-52)
+   */
   const getCurrentWeek = () => {
     const now = new Date();
     const start = new Date(now.getFullYear(), 0, 1);
@@ -161,6 +218,11 @@ function CashierView() {
     return Math.ceil((days + start.getDay() + 1) / 7);
   };
 
+  /**
+   * Submit the current order to the backend
+   * Validates inventory, creates order, and updates inventory automatically
+   * Shows success/error messages and refreshes incomplete orders list
+   */
   const submitOrder = async () => {
     if (currentOrder.length === 0) {
       alert('Order is empty');
@@ -171,7 +233,7 @@ function CashierView() {
       const orderData = {
         timeoforder: new Date().toISOString(),
         customerid: null,
-        employeeid: 1,
+        employeeid: 1, // Default employee ID
         totalcost: getTotal(),
         orderweek: getCurrentWeek(),
         orderItems: currentOrder.map(item => ({
@@ -186,6 +248,7 @@ function CashierView() {
       loadIncompleteOrders(); // Refresh incomplete orders list
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      // Handle inventory errors with user-friendly message
       if (errorMessage.includes('Insufficient inventory')) {
         alert('Cannot fulfill this order due to insufficient inventory.\nPlease check stock levels and try again.');
       } else {
