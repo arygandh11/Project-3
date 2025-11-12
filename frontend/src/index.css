@@ -69,53 +69,88 @@
 }
 
 @layer utilities {
-  /* Accessibility text size utilities */
-  /* Apply text size to text content elements when accessibility mode is active */
+  /* Accessibility text size utilities - Dramatic size increases */
+  /* Large mode: 50% larger text (24px base) */
   .accessibility-large p,
   .accessibility-large span,
   .accessibility-large div:not(button):not(input):not(select):not(textarea),
-  .accessibility-large h1,
-  .accessibility-large h2,
-  .accessibility-large h3,
-  .accessibility-large h4,
-  .accessibility-large h5,
-  .accessibility-large h6,
   .accessibility-large li,
   .accessibility-large td,
   .accessibility-large th,
   .accessibility-large label {
-    font-size: 1.125rem !important; /* 18px */
-    line-height: 1.75rem !important;
+    font-size: 1.5rem !important; /* 24px - 50% larger than typical 16px */
+    line-height: 2.25rem !important;
+  }
+  
+  .accessibility-large h1 {
+    font-size: 3rem !important; /* 48px */
+    line-height: 3.5rem !important;
+  }
+  
+  .accessibility-large h2 {
+    font-size: 2.5rem !important; /* 40px */
+    line-height: 3rem !important;
+  }
+  
+  .accessibility-large h3 {
+    font-size: 2rem !important; /* 32px */
+    line-height: 2.5rem !important;
+  }
+  
+  .accessibility-large h4,
+  .accessibility-large h5,
+  .accessibility-large h6 {
+    font-size: 1.75rem !important; /* 28px */
+    line-height: 2.25rem !important;
   }
   
   .accessibility-large button,
   .accessibility-large input,
   .accessibility-large select,
   .accessibility-large textarea {
-    font-size: 1.125rem !important;
+    font-size: 1.5rem !important;
+    padding: 0.75rem 1.5rem !important;
   }
   
+  /* Extra Large mode: 100% larger text (32px base) */
   .accessibility-xlarge p,
   .accessibility-xlarge span,
   .accessibility-xlarge div:not(button):not(input):not(select):not(textarea),
-  .accessibility-xlarge h1,
-  .accessibility-xlarge h2,
-  .accessibility-xlarge h3,
-  .accessibility-xlarge h4,
-  .accessibility-xlarge h5,
-  .accessibility-xlarge h6,
   .accessibility-xlarge li,
   .accessibility-xlarge td,
   .accessibility-xlarge th,
   .accessibility-xlarge label {
-    font-size: 1.25rem !important; /* 20px */
-    line-height: 1.875rem !important;
+    font-size: 2rem !important; /* 32px - double the typical 16px */
+    line-height: 3rem !important;
+  }
+  
+  .accessibility-xlarge h1 {
+    font-size: 4rem !important; /* 64px */
+    line-height: 4.5rem !important;
+  }
+  
+  .accessibility-xlarge h2 {
+    font-size: 3.5rem !important; /* 56px */
+    line-height: 4rem !important;
+  }
+  
+  .accessibility-xlarge h3 {
+    font-size: 3rem !important; /* 48px */
+    line-height: 3.5rem !important;
+  }
+  
+  .accessibility-xlarge h4,
+  .accessibility-xlarge h5,
+  .accessibility-xlarge h6 {
+    font-size: 2.5rem !important; /* 40px */
+    line-height: 3rem !important;
   }
   
   .accessibility-xlarge button,
   .accessibility-xlarge input,
   .accessibility-xlarge select,
   .accessibility-xlarge textarea {
-    font-size: 1.25rem !important;
+    font-size: 2rem !important;
+    padding: 1rem 2rem !important;
   }
 }

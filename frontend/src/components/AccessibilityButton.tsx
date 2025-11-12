@@ -31,11 +31,12 @@ function AccessibilityButton() {
   return (
     <button
       onClick={cycleTextSize}
-      className="fixed bottom-4 right-4 z-50 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-full shadow-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+      className="fixed bottom-6 right-6 z-50 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 px-5 rounded-full shadow-xl transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 transform hover:scale-110"
       aria-label={`Text size: ${textSize}. Click to change text size`}
       title={`Text size: ${textSize}. Click to cycle through sizes`}
+      style={{ minWidth: '60px', minHeight: '60px' }}
     >
-      <span className="text-lg font-semibold">{getButtonLabel()}</span>
+      <span className="text-xl font-bold">{getButtonLabel()}</span>
     </button>
   );
 }
