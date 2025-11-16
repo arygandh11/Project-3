@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getAllInventory, addInventoryItem, updateInventoryQuantity } from '../api/inventoryApi';
 import type { InventoryItem } from '../api/inventoryApi';
+import { getAllMenuItems } from '../api/menuApi';
+import type { MenuItem } from '../api/menuApi';
 import { getProductUsageData, getTotalSales } from '../api/analyticsApi';
 import { getAllOrders } from '../api/orderApi';
 import type { OrderResponse } from '../api/orderApi';
@@ -17,6 +19,8 @@ function ManagerView() {
   const [activeTab, setActiveTab] = useState<'inventory' | 'analytics' | 'orders'>('inventory');
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [productUsage, setProductUsage] = useState<Record<string, number>>({});
   const [salesData, setSalesData] = useState<{ total: number; period: string } | null>(null);
   const [orders, setOrders] = useState<OrderResponse[]>([]);
@@ -36,6 +40,11 @@ function ManagerView() {
   const [endDate, setEndDate] = useState(() => {
     return new Date().toISOString().split('T')[0];
   });
+
+  // Extract unique categories from menu items
+  const categories = useMemo(() => {
+    return [...new Set(menuItems.map(item => item.drinkcategory))];
+  }, [menuItems]);
 
   useEffect(() => {
     loadData();
@@ -64,11 +73,15 @@ function ManagerView() {
   };
 
   /**
-   * Load all inventory items
+   * Load all inventory items and menu items for category filtering
    */
   const loadInventory = async () => {
-    const items = await getAllInventory();
+    const [items, menu] = await Promise.all([
+      getAllInventory(),
+      getAllMenuItems()
+    ]);
     setInventory(items);
+    setMenuItems(menu);
   };
 
   /**
@@ -251,6 +264,54 @@ function ManagerView() {
             <div>
               <h2 className="text-lg font-normal mb-4">Inventory Management</h2>
               
+              {/* Category Filter */}
+              <div className="mb-4">
+                <label className="text-sm mr-2">Filter by Drink Category:</label>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="p-2 border border-gray-300 text-sm bg-white w-64"
+                >
+                  <option value="all">All Categories</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Menu Items List (Drinks) */}
+              <div className="border border-gray-300 mb-5">
+                <div className="bg-gray-100 p-2.5 border-b-2 border-gray-300">
+                  <h3 className="text-base font-bold m-0">Menu Items ({selectedCategory === 'all' ? 'All Categories' : selectedCategory})</h3>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                  <table className="w-full border-collapse">
+                    <thead className="sticky top-0 bg-gray-50">
+                      <tr className="border-b border-gray-300">
+                        <th className="p-2.5 text-left text-sm font-bold">ID</th>
+                        <th className="p-2.5 text-left text-sm font-bold">Drink Name</th>
+                        <th className="p-2.5 text-left text-sm font-bold">Category</th>
+                        <th className="p-2.5 text-left text-sm font-bold">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {menuItems
+                        .filter(item => selectedCategory === 'all' || item.drinkcategory === selectedCategory)
+                        .map((item) => (
+                          <tr key={item.menuitemid} className="border-b border-gray-200">
+                            <td className="p-2.5 text-sm">{item.menuitemid}</td>
+                            <td className="p-2.5 text-sm">{item.menuitemname}</td>
+                            <td className="p-2.5 text-sm">{item.drinkcategory}</td>
+                            <td className="p-2.5 text-sm">${item.price.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               {/* Add New Item Form */}
               <div className="border border-gray-300 p-4 mb-5 bg-gray-50">
                 <h3 className="text-base font-normal mt-0 mb-2.5">Add New Inventory Item</h3>
@@ -274,11 +335,14 @@ function ManagerView() {
                 </div>
               </div>
 
-              {/* Inventory List */}
+              {/* Inventory List (Raw Ingredients) */}
               <div className="border border-gray-300">
+                <div className="bg-gray-100 p-2.5 border-b-2 border-gray-300">
+                  <h3 className="text-base font-bold m-0">Raw Ingredients</h3>
+                </div>
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-gray-100 border-b-2 border-gray-300">
+                    <tr className="bg-gray-50 border-b border-gray-300">
                       <th className="p-2.5 text-left text-sm font-bold">ID</th>
                       <th className="p-2.5 text-left text-sm font-bold">Item Name</th>
                       <th className="p-2.5 text-left text-sm font-bold">Quantity</th>
