@@ -58,16 +58,6 @@ const getTotalSales = async (req, res) => {
     }
 };
 
-module.exports = {
-    getProductUsageData,
-    getTotalSales,
-    getProductUsageChart,
-    getXReport,
-    getZReportLastRun,
-    generateZReport,
-    getSalesReport
-};
-
 /**
  * Get product usage (inventory) for a given time window
  * @route GET /api/analytics/product-usage-chart
@@ -285,3 +275,12 @@ const getSalesReport = async (req, res) => {
     }
 };
 
+module.exports = {
+    getProductUsageData,
+    getTotalSales,
+    getProductUsageChart,
+    getXReport,
+    getZReportLastRun,
+    generateZReport,
+    getSalesReport
+};
