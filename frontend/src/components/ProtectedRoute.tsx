@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 /**
@@ -13,20 +12,7 @@ interface ProtectedRouteProps {
 }
 
 function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, loading, refreshUser } = useAuth();
-  const hasRefreshed = useRef(false);
-
-  // Refresh auth when component mounts (helps with OAuth redirect timing)
-  useEffect(() => {
-    if (!loading && !isAuthenticated && !hasRefreshed.current) {
-      // Give it a moment for session cookie to be available, then refresh
-      hasRefreshed.current = true;
-      const timer = setTimeout(() => {
-        refreshUser();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [loading, isAuthenticated, refreshUser]);
+  const { isAuthenticated, loading } = useAuth();
 
   // Show loading state while checking authentication
   if (loading) {

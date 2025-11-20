@@ -38,25 +38,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * Check authentication status by fetching current user
    * @param retries Number of retry attempts (for OAuth redirect timing issues)
    */
-  const checkAuth = async (retries = 0) => {
+  const checkAuth = async () => {
     try {
       setLoading(true);
       const currentUser = await getCurrentUser();
       setUser(currentUser);
-      setLoading(false);
     } catch (error) {
       console.error('Error checking auth:', error);
-      // Retry once after a short delay if this is the first attempt
-      // This helps with OAuth redirect timing issues
-      if (retries === 0) {
-        setTimeout(() => {
-          checkAuth(1);
-        }, 500);
-        // Don't set loading to false yet, wait for retry
-        return;
-      }
       // If retry also failed, set user to null and stop loading
       setUser(null);
+    } finally {
       setLoading(false);
     }
   };
