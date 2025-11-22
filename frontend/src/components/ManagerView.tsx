@@ -16,13 +16,14 @@ import AddMenuItem from './reports/AddMenuItem';
 
 /**
  * Manager View component
- * Dashboard for managers with three main tabs:
- * - Inventory: View, add, and update inventory items
+ * Dashboard for managers with four main tabs:
+ * - Inventory: View, add, and update raw ingredient inventory items
+ * - Menu Items: View menu items (drinks) with category filtering
  * - Analytics: View product usage data and sales reports with date range selection
  * - Orders: View all orders with summary statistics (total revenue, completed/pending counts)
  */
 function ManagerView() {
-  const [activeTab, setActiveTab] = useState<'inventory' | 'analytics' | 'orders'>('inventory');
+  const [activeTab, setActiveTab] = useState<'inventory' | 'menu' | 'analytics' | 'orders'>('inventory');
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -143,6 +144,8 @@ function ManagerView() {
     try {
       if (activeTab === 'inventory') {
         await loadInventory();
+      } else if (activeTab === 'menu') {
+        await loadMenuItems();
       } else if (activeTab === 'analytics') {
         await loadAnalytics();
       } else if (activeTab === 'orders') {
@@ -157,14 +160,18 @@ function ManagerView() {
   };
 
   /**
-   * Load all inventory items and menu items for category filtering
+   * Load all inventory items
    */
   const loadInventory = async () => {
-    const [items, menu] = await Promise.all([
-      getAllInventory(),
-      getAllMenuItems()
-    ]);
+    const items = await getAllInventory();
     setInventory(items);
+  };
+
+  /**
+   * Load all menu items
+   */
+  const loadMenuItems = async () => {
+    const menu = await getAllMenuItems();
     setMenuItems(menu);
   };
 
@@ -398,6 +405,16 @@ function ManagerView() {
           Inventory
         </button>
         <button
+          onClick={() => setActiveTab('menu')}
+          className={`px-5 py-2.5 border-none bg-transparent cursor-pointer text-sm ${
+            activeTab === 'menu' 
+              ? 'border-b-2 border-black font-bold' 
+              : 'border-b-2 border-transparent font-normal'
+          }`}
+        >
+          Menu Items
+        </button>
+        <button
           onClick={() => setActiveTab('analytics')}
           className={`px-5 py-2.5 border-none bg-transparent cursor-pointer text-sm ${
             activeTab === 'analytics' 
@@ -428,54 +445,6 @@ function ManagerView() {
           {activeTab === 'inventory' && (
             <div>
               <h2 className="text-lg font-normal mb-4">Inventory Management</h2>
-              
-              {/* Category Filter */}
-              <div className="mb-4">
-                <label className="text-sm mr-2">Filter by Drink Category:</label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="p-2 border border-gray-300 text-sm bg-white w-64"
-                >
-                  <option value="all">All Categories</option>
-                  {categories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Menu Items List (Drinks) */}
-              <div className="border border-gray-300 mb-5">
-                <div className="bg-gray-100 p-2.5 border-b-2 border-gray-300">
-                  <h3 className="text-base font-bold m-0">Menu Items ({selectedCategory === 'all' ? 'All Categories' : selectedCategory})</h3>
-                </div>
-                <div className="max-h-[400px] overflow-y-auto">
-                  <table className="w-full border-collapse">
-                    <thead className="sticky top-0 bg-gray-50">
-                      <tr className="border-b border-gray-300">
-                        <th className="p-2.5 text-left text-sm font-bold">ID</th>
-                        <th className="p-2.5 text-left text-sm font-bold">Drink Name</th>
-                        <th className="p-2.5 text-left text-sm font-bold">Category</th>
-                        <th className="p-2.5 text-left text-sm font-bold">Price</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {menuItems
-                        .filter(item => selectedCategory === 'all' || item.drinkcategory === selectedCategory)
-                        .map((item) => (
-                          <tr key={item.menuitemid} className="border-b border-gray-200">
-                            <td className="p-2.5 text-sm">{item.menuitemid}</td>
-                            <td className="p-2.5 text-sm">{item.menuitemname}</td>
-                            <td className="p-2.5 text-sm">{item.drinkcategory}</td>
-                            <td className="p-2.5 text-sm">${item.price.toFixed(2)}</td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
 
               {/* Add New Item Form */}
               <div className="border border-gray-300 p-4 mb-5 bg-gray-50">
@@ -562,6 +531,61 @@ function ManagerView() {
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* Menu Items Tab */}
+          {activeTab === 'menu' && (
+            <div>
+              <h2 className="text-lg font-normal mb-4">Menu Items</h2>
+              
+              {/* Category Filter */}
+              <div className="mb-4">
+                <label className="text-sm mr-2">Filter by Drink Category:</label>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="p-2 border border-gray-300 text-sm bg-white w-64"
+                >
+                  <option value="all">All Categories</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Menu Items List (Drinks) */}
+              <div className="border border-gray-300">
+                <div className="bg-gray-100 p-2.5 border-b-2 border-gray-300">
+                  <h3 className="text-base font-bold m-0">Menu Items ({selectedCategory === 'all' ? 'All Categories' : selectedCategory})</h3>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                  <table className="w-full border-collapse">
+                    <thead className="sticky top-0 bg-gray-50">
+                      <tr className="border-b border-gray-300">
+                        <th className="p-2.5 text-left text-sm font-bold">ID</th>
+                        <th className="p-2.5 text-left text-sm font-bold">Drink Name</th>
+                        <th className="p-2.5 text-left text-sm font-bold">Category</th>
+                        <th className="p-2.5 text-left text-sm font-bold">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {menuItems
+                        .filter(item => selectedCategory === 'all' || item.drinkcategory === selectedCategory)
+                        .map((item) => (
+                          <tr key={item.menuitemid} className="border-b border-gray-200">
+                            <td className="p-2.5 text-sm">{item.menuitemid}</td>
+                            <td className="p-2.5 text-sm">{item.menuitemname}</td>
+                            <td className="p-2.5 text-sm">{item.drinkcategory}</td>
+                            <td className="p-2.5 text-sm">${item.price.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
