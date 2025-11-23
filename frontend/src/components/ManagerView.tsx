@@ -12,7 +12,6 @@ import ProductUsageChart from './reports/ProductUsageChart';
 import XReport from './reports/XReport';
 import ZReport from './reports/ZReport';
 import SalesReport from './reports/SalesReport';
-import AddMenuItem from './reports/AddMenuItem';
 
 /**
  * Manager View component
@@ -35,7 +34,7 @@ function ManagerView() {
   const [orders, setOrders] = useState<OrderResponse[]>([]);
   
   // Report selection state
-  const [selectedReport, setSelectedReport] = useState<'overview' | 'product-usage' | 'x-report' | 'z-report' | 'sales-report' | 'add-menu-item'>('overview');
+  const [selectedReport, setSelectedReport] = useState<'overview' | 'product-usage' | 'x-report' | 'z-report' | 'sales-report'>('overview');
   
   // Order filter state
   const [showOrderFilterModal, setShowOrderFilterModal] = useState(false);
@@ -1081,7 +1080,6 @@ function ManagerView() {
                     <option value="x-report">X-Report (Current Day)</option>
                     <option value="z-report">Z-Report (End of Day)</option>
                     <option value="sales-report">Sales Report by Item</option>
-                    <option value="add-menu-item">Add Menu Item</option>
                   </select>
                 </div>
               </div>
@@ -1205,7 +1203,6 @@ function ManagerView() {
                 {selectedReport === 'x-report' && <XReport />}
                 {selectedReport === 'z-report' && <ZReport />}
                 {selectedReport === 'sales-report' && <SalesReport />}
-                {selectedReport === 'add-menu-item' && <AddMenuItem />}
               </div>
             </div>
           )}
