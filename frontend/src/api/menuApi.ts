@@ -12,6 +12,16 @@ export interface MenuItem {
 }
 
 /**
+ * Menu item ingredient structure
+ * Represents an ingredient used in a menu item
+ */
+export interface MenuItemIngredient {
+    ingredientid: number;
+    ingredientname: string;
+    ingredientqty: number;
+}
+
+/**
  * Fetch all menu items
  * @returns Promise resolving to an array of menu items
  * Note: Prices are converted to numbers to handle potential string returns from database
@@ -28,4 +38,19 @@ export const getAllMenuItems = async (): Promise<MenuItem[]> => {
         }));
     }
     throw new Error(result.error || 'Failed to fetch menu items');
+};
+
+/**
+ * Fetch ingredients for a specific menu item
+ * @param menuItemId - The ID of the menu item
+ * @returns Promise resolving to an array of ingredients
+ * @throws Error if the API request fails
+ */
+export const getMenuItemIngredients = async (menuItemId: number): Promise<MenuItemIngredient[]> => {
+    const response = await fetch(`${API_BASE_URL}/menu/${menuItemId}/ingredients`);
+    const result = await response.json();
+    if (result.success) {
+        return result.data;
+    }
+    throw new Error(result.error || 'Failed to fetch menu item ingredients');
 };
