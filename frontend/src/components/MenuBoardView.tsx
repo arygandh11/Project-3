@@ -138,4 +138,3 @@ function MenuBoardView() {
 }
 
 export default MenuBoardView;
-
