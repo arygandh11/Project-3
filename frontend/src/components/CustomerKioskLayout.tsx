@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getAllMenuItems } from '../api/menuApi';
 import type { MenuItem } from '../api/menuApi';
@@ -17,6 +17,95 @@ interface CartItem {
 }
 
 /**
+ * Idle timeout duration in milliseconds (30 seconds)
+ */
+const IDLE_TIMEOUT = 30000;
+
+/**
+ * Seasonal menu items configuration
+ * Same as MenuBoardView - update this to change seasonal items
+ */
+const SEASONAL_MENU_ITEM_IDS = [6, 12, 22, 28]; // Matcha Milk Tea, Peach Oolong Tea, Peach Slush, Tiger Sugar Milk
+
+/**
+ * Attract Screen Component
+ * Displays when kiosk is idle to attract customer attention
+ * Features seasonal menu items spotlight
+ */
+function AttractScreen({ onInteract, seasonalItems }: { onInteract: () => void; seasonalItems: MenuItem[] }) {
+  return (
+    <div 
+      className="fixed inset-0 bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500 flex flex-col items-center justify-center z-50 cursor-pointer overflow-y-auto py-8"
+      onClick={onInteract}
+      onTouchStart={onInteract}
+      onMouseMove={onInteract}
+    >
+      <div className="text-center text-white px-8 w-full max-w-6xl">
+        {/* Header Section */}
+        <div className="mb-8 animate-pulse">
+          <div className="text-8xl mb-6 animate-bounce">🧋</div>
+          <h1 className="text-6xl md:text-7xl font-bold mb-4 drop-shadow-lg">
+            Welcome to Boba Shop
+          </h1>
+          <p className="text-2xl md:text-3xl mb-4 drop-shadow-md">
+            Touch anywhere to start ordering
+          </p>
+          <div className="text-xl md:text-2xl opacity-90 drop-shadow-sm">
+            ✨ Fresh drinks made just for you ✨
+          </div>
+        </div>
+
+        {/* Seasonal Items Spotlight */}
+        {seasonalItems.length > 0 && (
+          <div className="mt-12 mb-8">
+            <div className="flex items-center justify-center mb-6">
+              <span className="text-4xl mr-3">⭐</span>
+              <h2 className="text-4xl md:text-5xl font-bold text-white drop-shadow-lg">
+                Seasonal Specials
+              </h2>
+              <span className="text-4xl ml-3">⭐</span>
+            </div>
+            <p className="text-xl md:text-2xl mb-6 opacity-95">
+              Limited time offers - Try our seasonal favorites!
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 px-4">
+              {seasonalItems.map((item) => (
+                <div 
+                  key={item.menuitemid}
+                  className="bg-white rounded-xl p-6 shadow-2xl border-4 border-yellow-300 transform hover:scale-105 transition-transform duration-200"
+                  onClick={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-center mb-3">
+                    <span className="text-xs font-bold bg-red-500 text-white px-3 py-1.5 rounded-full">
+                      SEASONAL
+                    </span>
+                  </div>
+                  <div className="flex flex-col text-center">
+                    <span className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">
+                      {item.menuitemname}
+                    </span>
+                    <span className="text-base md:text-lg text-gray-600 mb-3">{item.drinkcategory}</span>
+                    <span className="text-3xl md:text-4xl font-bold text-purple-600">
+                      ${item.price.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Call to Action */}
+        <div className="mt-8 text-xl md:text-2xl opacity-90 drop-shadow-sm">
+          👆 Tap anywhere to begin 👆
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Customer Kiosk Layout component
  * Customer-facing self-service kiosk interface for ordering
  * Features:
@@ -24,6 +113,7 @@ interface CartItem {
  * - Shopping cart functionality
  * - Order submission
  * - Receipt display
+ * - Idle timeout with attract screen
  */
 function CustomerKioskLayout() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -31,12 +121,20 @@ function CustomerKioskLayout() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [isIdle, setIsIdle] = useState(false);
   const [receiptData, setReceiptData] = useState<{
     orderNumber: number;
     items: Array<{ name: string; quantity: number; price: number }>;
     total: number;
     timestamp: string;
   } | null>(null);
+  
+  const idleTimerRef = useRef<number | null>(null);
+
+  // Identify seasonal menu items
+  const seasonalItems = useMemo(() => {
+    return menuItems.filter(item => SEASONAL_MENU_ITEM_IDS.includes(item.menuitemid));
+  }, [menuItems]);
 
   // Extract unique categories from menu items
   const categories = useMemo(() => {
@@ -61,6 +159,55 @@ function CustomerKioskLayout() {
   }, []);
 
   /**
+   * Reset idle timer on user interaction
+   */
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+    }
+    
+    // If we're showing attract screen, hide it
+    setIsIdle(false);
+    
+    // Set new timeout
+    idleTimerRef.current = setTimeout(() => {
+      setIsIdle(true);
+    }, IDLE_TIMEOUT);
+  }, []);
+
+  /**
+   * Handle user interaction to dismiss attract screen
+   */
+  const handleInteraction = useCallback(() => {
+    resetIdleTimer();
+  }, [resetIdleTimer]);
+
+  /**
+   * Set up idle timeout detection
+   */
+  useEffect(() => {
+    // Start the idle timer
+    resetIdleTimer();
+
+    // Event listeners for user interactions
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    events.forEach(event => {
+      window.addEventListener(event, resetIdleTimer, true);
+    });
+
+    // Cleanup
+    return () => {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+      }
+      events.forEach(event => {
+        window.removeEventListener(event, resetIdleTimer, true);
+      });
+    };
+  }, [resetIdleTimer]);
+
+  /**
    * Load all menu items
    */
   const loadMenuItems = async () => {
@@ -80,6 +227,7 @@ function CustomerKioskLayout() {
    * @param menuItem - Menu item to add
    */
   const addToCart = (menuItem: MenuItem) => {
+    resetIdleTimer(); // Reset idle timer on interaction
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.menuitemid === menuItem.menuitemid);
       if (existingItem) {
@@ -104,6 +252,7 @@ function CustomerKioskLayout() {
    * @param quantity - New quantity
    */
   const updateCartQuantity = (menuitemid: number, quantity: number) => {
+    resetIdleTimer(); // Reset idle timer on interaction
     if (quantity <= 0) {
       removeFromCart(menuitemid);
       return;
@@ -122,6 +271,7 @@ function CustomerKioskLayout() {
    * @param menuitemid - Menu item ID to remove
    */
   const removeFromCart = (menuitemid: number) => {
+    resetIdleTimer(); // Reset idle timer on interaction
     setCart(prevCart => prevCart.filter(item => item.menuitemid !== menuitemid));
   };
 
@@ -129,6 +279,7 @@ function CustomerKioskLayout() {
    * Clear entire cart
    */
   const clearCart = () => {
+    resetIdleTimer(); // Reset idle timer on interaction
     setCart([]);
   };
 
@@ -146,6 +297,7 @@ function CustomerKioskLayout() {
    * Submit order
    */
   const submitOrder = async () => {
+    resetIdleTimer(); // Reset idle timer on interaction
     if (cart.length === 0) {
       alert('Your cart is empty');
       return;
@@ -204,6 +356,9 @@ function CustomerKioskLayout() {
 
   return (
     <div className="bg-white min-h-screen">
+      {/* Attract Screen - shown when idle */}
+      {isIdle && <AttractScreen onInteract={handleInteraction} seasonalItems={seasonalItems} />}
+
       {/* Receipt Modal */}
       {showReceipt && receiptData && (
         <Receipt
@@ -237,7 +392,10 @@ function CustomerKioskLayout() {
           {/* Category Filter */}
           <div className="mb-6 flex gap-2 flex-wrap">
             <button
-              onClick={() => setSelectedCategory('all')}
+              onClick={() => {
+                resetIdleTimer();
+                setSelectedCategory('all');
+              }}
               className={`px-6 py-3 rounded-lg text-lg font-medium transition-colors ${
                 selectedCategory === 'all'
                   ? 'bg-purple-600 text-white'
@@ -249,7 +407,10 @@ function CustomerKioskLayout() {
             {categories.map((category) => (
               <button
                 key={category}
-                onClick={() => setSelectedCategory(category)}
+                onClick={() => {
+                  resetIdleTimer();
+                  setSelectedCategory(category);
+                }}
                 className={`px-6 py-3 rounded-lg text-lg font-medium transition-colors ${
                   selectedCategory === category
                     ? 'bg-purple-600 text-white'
