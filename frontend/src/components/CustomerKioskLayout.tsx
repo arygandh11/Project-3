@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { getAllMenuItems } from '../api/menuApi';
 import type { MenuItem } from '../api/menuApi';
@@ -17,6 +17,39 @@ interface CartItem {
 }
 
 /**
+ * Idle timeout duration in milliseconds (30 seconds)
+ */
+const IDLE_TIMEOUT = 30000;
+
+/**
+ * Attract Screen Component
+ * Displays when kiosk is idle to attract customer attention
+ */
+function AttractScreen({ onInteract }: { onInteract: () => void }) {
+  return (
+    <div 
+      className="fixed inset-0 bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500 flex items-center justify-center z-50 cursor-pointer"
+      onClick={onInteract}
+      onTouchStart={onInteract}
+      onMouseMove={onInteract}
+    >
+      <div className="text-center text-white px-8 animate-pulse">
+        <div className="text-8xl mb-8 animate-bounce">🧋</div>
+        <h1 className="text-7xl font-bold mb-6 drop-shadow-lg">
+          Welcome to Boba Shop
+        </h1>
+        <p className="text-3xl mb-8 drop-shadow-md">
+          Touch anywhere to start ordering
+        </p>
+        <div className="text-2xl opacity-90 drop-shadow-sm">
+          ✨ Fresh drinks made just for you ✨
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Customer Kiosk Layout component
  * Customer-facing self-service kiosk interface for ordering
  * Features:
@@ -24,6 +57,7 @@ interface CartItem {
  * - Shopping cart functionality
  * - Order submission
  * - Receipt display
+ * - Idle timeout with attract screen
  */
 function CustomerKioskLayout() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -31,12 +65,15 @@ function CustomerKioskLayout() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [isIdle, setIsIdle] = useState(false);
   const [receiptData, setReceiptData] = useState<{
     orderNumber: number;
     items: Array<{ name: string; quantity: number; price: number }>;
     total: number;
     timestamp: string;
   } | null>(null);
+  
+  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Extract unique categories from menu items
   const categories = useMemo(() => {
@@ -61,6 +98,55 @@ function CustomerKioskLayout() {
   }, []);
 
   /**
+   * Reset idle timer on user interaction
+   */
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+    }
+    
+    // If we're showing attract screen, hide it
+    setIsIdle(false);
+    
+    // Set new timeout
+    idleTimerRef.current = setTimeout(() => {
+      setIsIdle(true);
+    }, IDLE_TIMEOUT);
+  }, []);
+
+  /**
+   * Handle user interaction to dismiss attract screen
+   */
+  const handleInteraction = useCallback(() => {
+    resetIdleTimer();
+  }, [resetIdleTimer]);
+
+  /**
+   * Set up idle timeout detection
+   */
+  useEffect(() => {
+    // Start the idle timer
+    resetIdleTimer();
+
+    // Event listeners for user interactions
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    
+    events.forEach(event => {
+      window.addEventListener(event, resetIdleTimer, true);
+    });
+
+    // Cleanup
+    return () => {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+      }
+      events.forEach(event => {
+        window.removeEventListener(event, resetIdleTimer, true);
+      });
+    };
+  }, [resetIdleTimer]);
+
+  /**
    * Load all menu items
    */
   const loadMenuItems = async () => {
@@ -80,6 +166,7 @@ function CustomerKioskLayout() {
    * @param menuItem - Menu item to add
    */
   const addToCart = (menuItem: MenuItem) => {
+    resetIdleTimer(); // Reset idle timer on interaction
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.menuitemid === menuItem.menuitemid);
       if (existingItem) {
@@ -104,6 +191,7 @@ function CustomerKioskLayout() {
    * @param quantity - New quantity
    */
   const updateCartQuantity = (menuitemid: number, quantity: number) => {
+    resetIdleTimer(); // Reset idle timer on interaction
     if (quantity <= 0) {
       removeFromCart(menuitemid);
       return;
@@ -122,6 +210,7 @@ function CustomerKioskLayout() {
    * @param menuitemid - Menu item ID to remove
    */
   const removeFromCart = (menuitemid: number) => {
+    resetIdleTimer(); // Reset idle timer on interaction
     setCart(prevCart => prevCart.filter(item => item.menuitemid !== menuitemid));
   };
 
@@ -129,6 +218,7 @@ function CustomerKioskLayout() {
    * Clear entire cart
    */
   const clearCart = () => {
+    resetIdleTimer(); // Reset idle timer on interaction
     setCart([]);
   };
 
@@ -146,6 +236,7 @@ function CustomerKioskLayout() {
    * Submit order
    */
   const submitOrder = async () => {
+    resetIdleTimer(); // Reset idle timer on interaction
     if (cart.length === 0) {
       alert('Your cart is empty');
       return;
@@ -204,6 +295,9 @@ function CustomerKioskLayout() {
 
   return (
     <div className="bg-white min-h-screen">
+      {/* Attract Screen - shown when idle */}
+      {isIdle && <AttractScreen onInteract={handleInteraction} />}
+
       {/* Receipt Modal */}
       {showReceipt && receiptData && (
         <Receipt
@@ -237,7 +331,10 @@ function CustomerKioskLayout() {
           {/* Category Filter */}
           <div className="mb-6 flex gap-2 flex-wrap">
             <button
-              onClick={() => setSelectedCategory('all')}
+              onClick={() => {
+                resetIdleTimer();
+                setSelectedCategory('all');
+              }}
               className={`px-6 py-3 rounded-lg text-lg font-medium transition-colors ${
                 selectedCategory === 'all'
                   ? 'bg-purple-600 text-white'
@@ -249,7 +346,10 @@ function CustomerKioskLayout() {
             {categories.map((category) => (
               <button
                 key={category}
-                onClick={() => setSelectedCategory(category)}
+                onClick={() => {
+                  resetIdleTimer();
+                  setSelectedCategory(category);
+                }}
                 className={`px-6 py-3 rounded-lg text-lg font-medium transition-colors ${
                   selectedCategory === category
                     ? 'bg-purple-600 text-white'
