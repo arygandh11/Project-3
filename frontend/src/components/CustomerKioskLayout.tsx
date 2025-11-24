@@ -22,27 +22,83 @@ interface CartItem {
 const IDLE_TIMEOUT = 30000;
 
 /**
+ * Seasonal menu items configuration
+ * Same as MenuBoardView - update this to change seasonal items
+ */
+const SEASONAL_MENU_ITEM_IDS = [6, 12, 22, 28]; // Matcha Milk Tea, Peach Oolong Tea, Peach Slush, Tiger Sugar Milk
+
+/**
  * Attract Screen Component
  * Displays when kiosk is idle to attract customer attention
+ * Features seasonal menu items spotlight
  */
-function AttractScreen({ onInteract }: { onInteract: () => void }) {
+function AttractScreen({ onInteract, seasonalItems }: { onInteract: () => void; seasonalItems: MenuItem[] }) {
   return (
     <div 
-      className="fixed inset-0 bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500 flex items-center justify-center z-50 cursor-pointer"
+      className="fixed inset-0 bg-gradient-to-br from-purple-600 via-purple-500 to-pink-500 flex flex-col items-center justify-center z-50 cursor-pointer overflow-y-auto py-8"
       onClick={onInteract}
       onTouchStart={onInteract}
       onMouseMove={onInteract}
     >
-      <div className="text-center text-white px-8 animate-pulse">
-        <div className="text-8xl mb-8 animate-bounce">🧋</div>
-        <h1 className="text-7xl font-bold mb-6 drop-shadow-lg">
-          Welcome to Boba Shop
-        </h1>
-        <p className="text-3xl mb-8 drop-shadow-md">
-          Touch anywhere to start ordering
-        </p>
-        <div className="text-2xl opacity-90 drop-shadow-sm">
-          ✨ Fresh drinks made just for you ✨
+      <div className="text-center text-white px-8 w-full max-w-6xl">
+        {/* Header Section */}
+        <div className="mb-8 animate-pulse">
+          <div className="text-8xl mb-6 animate-bounce">🧋</div>
+          <h1 className="text-6xl md:text-7xl font-bold mb-4 drop-shadow-lg">
+            Welcome to Boba Shop
+          </h1>
+          <p className="text-2xl md:text-3xl mb-4 drop-shadow-md">
+            Touch anywhere to start ordering
+          </p>
+          <div className="text-xl md:text-2xl opacity-90 drop-shadow-sm">
+            ✨ Fresh drinks made just for you ✨
+          </div>
+        </div>
+
+        {/* Seasonal Items Spotlight */}
+        {seasonalItems.length > 0 && (
+          <div className="mt-12 mb-8">
+            <div className="flex items-center justify-center mb-6">
+              <span className="text-4xl mr-3">⭐</span>
+              <h2 className="text-4xl md:text-5xl font-bold text-white drop-shadow-lg">
+                Seasonal Specials
+              </h2>
+              <span className="text-4xl ml-3">⭐</span>
+            </div>
+            <p className="text-xl md:text-2xl mb-6 opacity-95">
+              Limited time offers - Try our seasonal favorites!
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 px-4">
+              {seasonalItems.map((item) => (
+                <div 
+                  key={item.menuitemid}
+                  className="bg-white rounded-xl p-6 shadow-2xl border-4 border-yellow-300 transform hover:scale-105 transition-transform duration-200"
+                  onClick={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-center mb-3">
+                    <span className="text-xs font-bold bg-red-500 text-white px-3 py-1.5 rounded-full">
+                      SEASONAL
+                    </span>
+                  </div>
+                  <div className="flex flex-col text-center">
+                    <span className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">
+                      {item.menuitemname}
+                    </span>
+                    <span className="text-base md:text-lg text-gray-600 mb-3">{item.drinkcategory}</span>
+                    <span className="text-3xl md:text-4xl font-bold text-purple-600">
+                      ${item.price.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Call to Action */}
+        <div className="mt-8 text-xl md:text-2xl opacity-90 drop-shadow-sm">
+          👆 Tap anywhere to begin 👆
         </div>
       </div>
     </div>
@@ -74,6 +130,11 @@ function CustomerKioskLayout() {
   } | null>(null);
   
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Identify seasonal menu items
+  const seasonalItems = useMemo(() => {
+    return menuItems.filter(item => SEASONAL_MENU_ITEM_IDS.includes(item.menuitemid));
+  }, [menuItems]);
 
   // Extract unique categories from menu items
   const categories = useMemo(() => {
@@ -296,7 +357,7 @@ function CustomerKioskLayout() {
   return (
     <div className="bg-white min-h-screen">
       {/* Attract Screen - shown when idle */}
-      {isIdle && <AttractScreen onInteract={handleInteraction} />}
+      {isIdle && <AttractScreen onInteract={handleInteraction} seasonalItems={seasonalItems} />}
 
       {/* Receipt Modal */}
       {showReceipt && receiptData && (
