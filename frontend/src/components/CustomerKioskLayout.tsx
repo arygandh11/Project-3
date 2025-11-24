@@ -129,7 +129,7 @@ function CustomerKioskLayout() {
     timestamp: string;
   } | null>(null);
   
-  const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const idleTimerRef = useRef<number | null>(null);
 
   // Identify seasonal menu items
   const seasonalItems = useMemo(() => {
