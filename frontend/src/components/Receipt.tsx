@@ -147,3 +147,4 @@ function Receipt({ orderNumber, items, total, timestamp, onClose }: ReceiptProps
 }
 
 export default Receipt;
+// TEST
