@@ -4,8 +4,8 @@ import type { InventoryItem } from '../api/inventoryApi';
 import { getAllMenuItems, getMenuItemIngredients, updateMenuItemIngredient, addMenuItemIngredient, removeMenuItemIngredient, addMenuItem, updateMenuItem, deleteMenuItem } from '../api/menuApi';
 import type { MenuItem, MenuItemIngredient } from '../api/menuApi';
 import { getProductUsageData, getTotalSales } from '../api/analyticsApi';
-import { getAllOrders } from '../api/orderApi';
-import type { OrderResponse } from '../api/orderApi';
+import { getAllOrders, getOrderItems } from '../api/orderApi';
+import type { OrderResponse, OrderItemDetail } from '../api/orderApi';
 import Button from './ui/Button';
 import API_BASE_URL from '../api/config';
 import ProductUsageChart from './reports/ProductUsageChart';
@@ -32,6 +32,11 @@ function ManagerView() {
   const [productUsageFilterType, setProductUsageFilterType] = useState<'category' | 'drink'>('category');
   const [salesData, setSalesData] = useState<{ total: number; period: string } | null>(null);
   const [orders, setOrders] = useState<OrderResponse[]>([]);
+  
+  // Order items state
+  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
+  const [orderItems, setOrderItems] = useState<Record<number, OrderItemDetail[]>>({});
+  const [loadingOrderItems, setLoadingOrderItems] = useState<number | null>(null);
   
   // Report selection state
   const [selectedReport, setSelectedReport] = useState<'overview' | 'product-usage' | 'x-report' | 'z-report' | 'sales-report'>('overview');
@@ -362,6 +367,36 @@ function ManagerView() {
   useEffect(() => {
     setOrderDisplayLimit(50);
   }, [orderFilters]);
+
+  /**
+   * Toggle order details expansion and load order items
+   * @param orderId - Order ID to expand/collapse
+   */
+  const toggleOrderDetails = async (orderId: number) => {
+    if (expandedOrderId === orderId) {
+      // Collapse if already expanded
+      setExpandedOrderId(null);
+      return;
+    }
+
+    // Expand and load items if not already loaded
+    setExpandedOrderId(orderId);
+    if (!orderItems[orderId]) {
+      setLoadingOrderItems(orderId);
+      try {
+        const items = await getOrderItems(orderId);
+        setOrderItems(prev => ({
+          ...prev,
+          [orderId]: items
+        }));
+      } catch (err) {
+        console.error('Error loading order items:', err);
+        alert('Failed to load order items');
+      } finally {
+        setLoadingOrderItems(null);
+      }
+    }
+  };
 
   /**
    * Toggle order completion status
@@ -1343,6 +1378,7 @@ function ManagerView() {
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="bg-gray-100 border-b-2 border-gray-300">
+                      <th className="p-2.5 text-left text-sm font-bold w-8"></th>
                       <th className="p-2.5 text-left text-sm font-bold">Order ID</th>
                       <th className="p-2.5 text-left text-sm font-bold">Date</th>
                       <th className="p-2.5 text-left text-sm font-bold">Total</th>
@@ -1352,39 +1388,99 @@ function ManagerView() {
                   <tbody>
                     {filteredOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="p-5 text-center text-gray-500">
+                        <td colSpan={5} className="p-5 text-center text-gray-500">
                           No orders found
                         </td>
                       </tr>
                     ) : (
                       filteredOrders.map((order) => (
-                        <tr key={order.orderid} className="border-b border-gray-200">
-                          <td className="p-2.5 text-sm">#{order.orderid}</td>
-                          <td className="p-2.5 text-sm">
-                            {new Date(order.timeoforder).toLocaleString()}
-                          </td>
-                          <td className="p-2.5 text-sm">
-                            ${Number(order.totalcost).toFixed(2)}
-                          </td>
-                          <td className="p-2.5 text-sm">
-                            <div className="flex items-center gap-2">
-                              <span className={`px-2 py-1 rounded text-xs ${
-                                order.is_complete 
-                                  ? 'bg-green-50 text-green-800' 
-                                  : 'bg-orange-50 text-orange-800'
-                              }`}>
-                                {order.is_complete ? 'Complete' : 'Pending'}
-                              </span>
+                        <>
+                          <tr key={order.orderid} className="border-b border-gray-200 hover:bg-gray-50">
+                            <td className="p-2.5">
                               <button
-                                onClick={() => toggleOrderStatus(order.orderid, order.is_complete)}
-                                className="w-5 h-5 flex items-center justify-center bg-blue-500 text-white rounded text-xs font-bold hover:bg-blue-600 transition-colors"
-                                title={`Mark as ${order.is_complete ? 'Pending' : 'Complete'}`}
+                                onClick={() => toggleOrderDetails(order.orderid)}
+                                className="w-6 h-6 flex items-center justify-center bg-gray-200 hover:bg-gray-300 rounded text-sm font-bold transition-colors"
+                                title="View order details"
                               >
-                                ⟳
+                                {expandedOrderId === order.orderid ? '−' : '+'}
                               </button>
-                            </div>
-                          </td>
-                        </tr>
+                            </td>
+                            <td className="p-2.5 text-sm">#{order.orderid}</td>
+                            <td className="p-2.5 text-sm">
+                              {new Date(order.timeoforder).toLocaleString()}
+                            </td>
+                            <td className="p-2.5 text-sm">
+                              ${Number(order.totalcost).toFixed(2)}
+                            </td>
+                            <td className="p-2.5 text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className={`px-2 py-1 rounded text-xs ${
+                                  order.is_complete 
+                                    ? 'bg-green-50 text-green-800' 
+                                    : 'bg-orange-50 text-orange-800'
+                                }`}>
+                                  {order.is_complete ? 'Complete' : 'Pending'}
+                                </span>
+                                <button
+                                  onClick={() => toggleOrderStatus(order.orderid, order.is_complete)}
+                                  className="w-5 h-5 flex items-center justify-center bg-blue-500 text-white rounded text-xs font-bold hover:bg-blue-600 transition-colors"
+                                  title={`Mark as ${order.is_complete ? 'Pending' : 'Complete'}`}
+                                >
+                                  ⟳
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                          {expandedOrderId === order.orderid && (
+                            <tr key={`${order.orderid}-details`} className="bg-gray-50">
+                              <td colSpan={5} className="p-4">
+                                {loadingOrderItems === order.orderid ? (
+                                  <div className="text-center text-sm text-gray-500 py-4">
+                                    Loading order items...
+                                  </div>
+                                ) : orderItems[order.orderid] && orderItems[order.orderid].length > 0 ? (
+                                  <div className="bg-white border border-gray-200 rounded">
+                                    <div className="bg-gray-100 px-3 py-2 border-b border-gray-200">
+                                      <h4 className="text-sm font-bold">Order Items</h4>
+                                    </div>
+                                    <table className="w-full">
+                                      <thead>
+                                        <tr className="bg-gray-50 border-b border-gray-200">
+                                          <th className="p-2 text-left text-xs font-bold">Drink Name</th>
+                                          <th className="p-2 text-left text-xs font-bold">Size</th>
+                                          <th className="p-2 text-left text-xs font-bold">Quantity</th>
+                                          <th className="p-2 text-left text-xs font-bold">Price</th>
+                                          <th className="p-2 text-left text-xs font-bold">Subtotal</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {orderItems[order.orderid].map((item) => (
+                                          <tr key={item.orderitemid} className="border-b border-gray-100 last:border-0">
+                                            <td className="p-2 text-xs">{item.menuitemname}</td>
+                                            <td className="p-2 text-xs">
+                                              <span className="px-2 py-0.5 bg-purple-100 text-purple-800 rounded text-xs font-medium">
+                                                {item.size}
+                                              </span>
+                                            </td>
+                                            <td className="p-2 text-xs">{item.quantity}</td>
+                                            <td className="p-2 text-xs">${Number(item.price).toFixed(2)}</td>
+                                            <td className="p-2 text-xs font-semibold">
+                                              ${(Number(item.price) * item.quantity).toFixed(2)}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ) : (
+                                  <div className="text-center text-sm text-gray-500 py-4">
+                                    No items found for this order
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </>
                       ))
                     )}
                   </tbody>

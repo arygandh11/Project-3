@@ -7,13 +7,29 @@ import Button from './ui/Button';
 import Receipt from './Receipt';
 
 /**
+ * Available drink sizes
+ */
+type DrinkSize = 'Small' | 'Medium' | 'Large';
+
+/**
+ * Price multipliers for different sizes
+ */
+const SIZE_MULTIPLIERS: Record<DrinkSize, number> = {
+  'Small': 0.85,
+  'Medium': 1.0,
+  'Large': 1.25
+};
+
+/**
  * Order item structure for the current order being built
  */
 interface OrderItem {
   menuitemid: number;
   quantity: number;
   name: string;
+  basePrice: number;
   price: number;
+  size: DrinkSize;
 }
 
 /**
@@ -33,6 +49,7 @@ interface OrderItem {
 function CashierView() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemQuantities, setItemQuantities] = useState<Record<number, number>>({});
+  const [itemSizes, setItemSizes] = useState<Record<number, DrinkSize>>({});
   const [customerName, setCustomerName] = useState('');
   const [currentOrder, setCurrentOrder] = useState<OrderItem[]>([]);
   const [incompleteOrders, setIncompleteOrders] = useState<OrderResponse[]>([]);
@@ -120,12 +137,15 @@ function CashierView() {
       setLoading(true);
       const items = await getAllMenuItems();
       setMenuItems(items);
-      // Initialize quantities to 1 for all items
+      // Initialize quantities to 1 and sizes to Medium for all items
       const initialQuantities: Record<number, number> = {};
+      const initialSizes: Record<number, DrinkSize> = {};
       items.forEach(item => {
         initialQuantities[item.menuitemid] = 1;
+        initialSizes[item.menuitemid] = 'Medium';
       });
       setItemQuantities(initialQuantities);
+      setItemSizes(initialSizes);
     } catch (err) {
       console.error('Error loading menu items:', err);
     } finally {
@@ -142,6 +162,18 @@ function CashierView() {
     setItemQuantities(prev => ({
       ...prev,
       [menuitemid]: quantity
+    }));
+  };
+
+  /**
+   * Update the size selector for a specific menu item
+   * @param menuitemid - Menu item ID
+   * @param size - New size value
+   */
+  const updateItemSize = (menuitemid: number, size: DrinkSize) => {
+    setItemSizes(prev => ({
+      ...prev,
+      [menuitemid]: size
     }));
   };
 
@@ -222,19 +254,21 @@ function CashierView() {
 
   /**
    * Add a menu item to the current order
-   * If the item already exists, increments its quantity instead of adding a duplicate
+   * If the item already exists with the same size, increments its quantity instead of adding a duplicate
    * @param menuItem - Menu item to add to the order
    */
   const addToOrder = (menuItem: MenuItem) => {
     const quantity = itemQuantities[menuItem.menuitemid] || 1;
+    const size = itemSizes[menuItem.menuitemid] || 'Medium';
+    const price = menuItem.price * SIZE_MULTIPLIERS[size];
 
-    // Check if item already exists in order
+    // Check if item already exists in order with the same size
     const existingItemIndex = currentOrder.findIndex(
-      item => item.menuitemid === menuItem.menuitemid
+      item => item.menuitemid === menuItem.menuitemid && item.size === size
     );
 
     if (existingItemIndex >= 0) {
-      // Update quantity if item already exists
+      // Update quantity if item already exists with same size
       const updatedOrder = [...currentOrder];
       updatedOrder[existingItemIndex].quantity += quantity;
       setCurrentOrder(updatedOrder);
@@ -244,7 +278,9 @@ function CashierView() {
         menuitemid: menuItem.menuitemid,
         quantity: quantity,
         name: menuItem.menuitemname,
-        price: menuItem.price
+        basePrice: menuItem.price,
+        price: price,
+        size: size
       };
       setCurrentOrder([...currentOrder, orderItem]);
     }
@@ -298,7 +334,9 @@ function CashierView() {
         orderweek: getCurrentWeek(),
         orderItems: currentOrder.map(item => ({
           menuitemid: item.menuitemid,
-          quantity: item.quantity
+          quantity: item.quantity,
+          size: item.size,
+          price: item.price
         }))
       };
 
@@ -308,7 +346,7 @@ function CashierView() {
       setReceiptData({
         orderNumber: result.orderid,
         items: currentOrder.map(item => ({
-          name: item.name,
+          name: `${item.name} (${item.size})`,
           quantity: item.quantity,
           price: item.price
         })),
@@ -399,9 +437,23 @@ function CashierView() {
                     className="p-3 border-b border-gray-200 flex items-center gap-4"
                   >
                     <div className="flex-1 text-sm">
-                      {item.menuitemname} - ${item.price.toFixed(2)}
+                      <div>{item.menuitemname}</div>
+                      <div className="text-xs text-gray-600">
+                        ${(item.price * SIZE_MULTIPLIERS[itemSizes[item.menuitemid] || 'Medium']).toFixed(2)}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      <label className="text-xs">Size:</label>
+                      <select
+                        value={itemSizes[item.menuitemid] || 'Medium'}
+                        onChange={(e) => updateItemSize(item.menuitemid, e.target.value as DrinkSize)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 border border-gray-300 text-xs w-[70px] bg-white"
+                      >
+                        <option value="Small">S</option>
+                        <option value="Medium">M</option>
+                        <option value="Large">L</option>
+                      </select>
                       <label className="text-xs">Qty:</label>
                       <select
                         value={itemQuantities[item.menuitemid] || 1}
@@ -433,7 +485,8 @@ function CashierView() {
             ) : (
               currentOrder.map((item, index) => (
                 <div key={index} className="p-2 border-b border-gray-200">
-                  {item.name} x{item.quantity} - ${(item.price * item.quantity).toFixed(2)}
+                  <div>{item.name} ({item.size})</div>
+                  <div className="text-xs text-gray-600">x{item.quantity} - ${(item.price * item.quantity).toFixed(2)}</div>
                 </div>
               ))
             )}
@@ -516,7 +569,7 @@ function CashierView() {
                             >
                               <div className="flex-1">
                                 <div className={item.is_complete ? 'font-normal' : 'font-bold'}>
-                                  {item.menuitemname} x{item.quantity}
+                                  {item.menuitemname} ({item.size}) x{item.quantity}
                                 </div>
                                 <div className="text-[10px] text-gray-600">
                                   ${(item.price * item.quantity).toFixed(2)}

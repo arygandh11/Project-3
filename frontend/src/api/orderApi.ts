@@ -2,11 +2,13 @@ import API_BASE_URL from './config';
 
 /**
  * Order item structure for creating orders
- * Contains menu item ID and quantity
+ * Contains menu item ID, quantity, size, and price
  */
 export interface OrderItem {
   menuitemid: number;
   quantity: number;
+  size?: string; // Optional size: Small, Medium, or Large (defaults to Medium)
+  price?: number; // Optional price per item (calculated based on size)
 }
 
 /**
@@ -33,6 +35,7 @@ export interface OrderResponse {
   totalcost: number;
   orderweek: number;
   is_complete: boolean;
+  size: string;
 }
 
 /**
@@ -45,6 +48,7 @@ export interface OrderItemDetail {
   menuitemid: number;
   quantity: number;
   is_complete: boolean;
+  size: string;
   menuitemname: string;
   price: number;
 }

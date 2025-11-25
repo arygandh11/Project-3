@@ -7,13 +7,29 @@ import Button from './ui/Button';
 import Receipt from './Receipt';
 
 /**
+ * Available drink sizes
+ */
+type DrinkSize = 'Small' | 'Medium' | 'Large';
+
+/**
+ * Price multipliers for different sizes
+ */
+const SIZE_MULTIPLIERS: Record<DrinkSize, number> = {
+  'Small': 0.85,
+  'Medium': 1.0,
+  'Large': 1.25
+};
+
+/**
  * Cart item structure
  */
 interface CartItem {
   menuitemid: number;
   name: string;
+  basePrice: number;
   price: number;
   quantity: number;
+  size: DrinkSize;
 }
 
 /**
@@ -122,6 +138,7 @@ function CustomerKioskLayout() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showReceipt, setShowReceipt] = useState(false);
   const [isIdle, setIsIdle] = useState(false);
+  const [selectedSize, setSelectedSize] = useState<DrinkSize>('Medium');
   const [receiptData, setReceiptData] = useState<{
     orderNumber: number;
     items: Array<{ name: string; quantity: number; price: number }>;
@@ -225,14 +242,19 @@ function CustomerKioskLayout() {
   /**
    * Add item to cart
    * @param menuItem - Menu item to add
+   * @param size - Size of the drink
    */
-  const addToCart = (menuItem: MenuItem) => {
+  const addToCart = (menuItem: MenuItem, size: DrinkSize = selectedSize) => {
     resetIdleTimer(); // Reset idle timer on interaction
+    const price = menuItem.price * SIZE_MULTIPLIERS[size];
+    
     setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.menuitemid === menuItem.menuitemid);
+      const existingItem = prevCart.find(
+        item => item.menuitemid === menuItem.menuitemid && item.size === size
+      );
       if (existingItem) {
         return prevCart.map(item =>
-          item.menuitemid === menuItem.menuitemid
+          item.menuitemid === menuItem.menuitemid && item.size === size
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
@@ -240,8 +262,10 @@ function CustomerKioskLayout() {
       return [...prevCart, {
         menuitemid: menuItem.menuitemid,
         name: menuItem.menuitemname,
-        price: menuItem.price,
-        quantity: 1
+        basePrice: menuItem.price,
+        price: price,
+        quantity: 1,
+        size: size
       }];
     });
   };
@@ -249,17 +273,18 @@ function CustomerKioskLayout() {
   /**
    * Update item quantity in cart
    * @param menuitemid - Menu item ID
+   * @param size - Size of the item
    * @param quantity - New quantity
    */
-  const updateCartQuantity = (menuitemid: number, quantity: number) => {
+  const updateCartQuantity = (menuitemid: number, size: DrinkSize, quantity: number) => {
     resetIdleTimer(); // Reset idle timer on interaction
     if (quantity <= 0) {
-      removeFromCart(menuitemid);
+      removeFromCart(menuitemid, size);
       return;
     }
     setCart(prevCart =>
       prevCart.map(item =>
-        item.menuitemid === menuitemid
+        item.menuitemid === menuitemid && item.size === size
           ? { ...item, quantity }
           : item
       )
@@ -267,12 +292,34 @@ function CustomerKioskLayout() {
   };
 
   /**
+   * Update item size in cart
+   * @param menuitemid - Menu item ID
+   * @param currentSize - Current size
+   * @param newSize - New size
+   */
+  const updateCartSize = (menuitemid: number, currentSize: DrinkSize, newSize: DrinkSize) => {
+    resetIdleTimer(); // Reset idle timer on interaction
+    setCart(prevCart =>
+      prevCart.map(item => {
+        if (item.menuitemid === menuitemid && item.size === currentSize) {
+          const newPrice = item.basePrice * SIZE_MULTIPLIERS[newSize];
+          return { ...item, size: newSize, price: newPrice };
+        }
+        return item;
+      })
+    );
+  };
+
+  /**
    * Remove item from cart
    * @param menuitemid - Menu item ID to remove
+   * @param size - Size of the item
    */
-  const removeFromCart = (menuitemid: number) => {
+  const removeFromCart = (menuitemid: number, size: DrinkSize) => {
     resetIdleTimer(); // Reset idle timer on interaction
-    setCart(prevCart => prevCart.filter(item => item.menuitemid !== menuitemid));
+    setCart(prevCart => prevCart.filter(
+      item => !(item.menuitemid === menuitemid && item.size === size)
+    ));
   };
 
   /**
@@ -312,7 +359,9 @@ function CustomerKioskLayout() {
         orderweek: getCurrentWeek(),
         orderItems: cart.map(item => ({
           menuitemid: item.menuitemid,
-          quantity: item.quantity
+          quantity: item.quantity,
+          size: item.size,
+          price: item.price
         }))
       };
 
@@ -322,7 +371,7 @@ function CustomerKioskLayout() {
       setReceiptData({
         orderNumber: result.orderid,
         items: cart.map(item => ({
-          name: item.name,
+          name: `${item.name} (${item.size})`,
           quantity: item.quantity,
           price: item.price
         })),
@@ -422,6 +471,32 @@ function CustomerKioskLayout() {
             ))}
           </div>
 
+          {/* Size Selector */}
+          <div className="mb-6 bg-white border-2 border-purple-200 rounded-lg p-4">
+            <h3 className="text-lg font-semibold mb-3 text-gray-800">Select Size:</h3>
+            <div className="flex gap-3">
+              {(['Small', 'Medium', 'Large'] as DrinkSize[]).map((size) => (
+                <button
+                  key={size}
+                  onClick={() => {
+                    resetIdleTimer();
+                    setSelectedSize(size);
+                  }}
+                  className={`flex-1 px-4 py-3 rounded-lg text-lg font-medium transition-all ${
+                    selectedSize === size
+                      ? 'bg-purple-600 text-white shadow-lg scale-105'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <div>{size}</div>
+                  <div className="text-sm opacity-80">
+                    {size === 'Small' ? '-15%' : size === 'Large' ? '+25%' : 'Base'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Menu Items Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredMenuItems.length === 0 ? (
@@ -429,28 +504,34 @@ function CustomerKioskLayout() {
                 No items found in this category
               </div>
             ) : (
-              filteredMenuItems.map((item) => (
-                <div
-                  key={item.menuitemid}
-                  className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer"
-                  onClick={() => addToCart(item)}
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="text-2xl font-bold text-gray-800">{item.menuitemname}</h3>
-                    <span className="text-xl font-bold text-purple-600">${item.price.toFixed(2)}</span>
-                  </div>
-                  <p className="text-gray-600 mb-4">{item.drinkcategory}</p>
-                  <button
-                    className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-purple-700 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      addToCart(item);
-                    }}
+              filteredMenuItems.map((item) => {
+                const priceForSize = item.price * SIZE_MULTIPLIERS[selectedSize];
+                return (
+                  <div
+                    key={item.menuitemid}
+                    className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer"
+                    onClick={() => addToCart(item)}
                   >
-                    Add to Cart
-                  </button>
-                </div>
-              ))
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="text-2xl font-bold text-gray-800">{item.menuitemname}</h3>
+                      <div className="text-right">
+                        <span className="text-xl font-bold text-purple-600">${priceForSize.toFixed(2)}</span>
+                        <div className="text-sm text-gray-500">{selectedSize}</div>
+                      </div>
+                    </div>
+                    <p className="text-gray-600 mb-4">{item.drinkcategory}</p>
+                    <button
+                      className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-purple-700 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToCart(item);
+                      }}
+                    >
+                      Add to Cart
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
@@ -469,18 +550,35 @@ function CustomerKioskLayout() {
               </div>
             ) : (
               <div className="space-y-4">
-                {cart.map((item) => (
+                {cart.map((item, index) => (
                   <div
-                    key={item.menuitemid}
+                    key={`${item.menuitemid}-${item.size}-${index}`}
                     className="bg-white rounded-lg p-4 shadow-sm border border-gray-200"
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex-1">
                         <h4 className="font-bold text-lg text-gray-800">{item.name}</h4>
                         <p className="text-gray-600 text-sm">${item.price.toFixed(2)} each</p>
+                        
+                        {/* Size Selector in Cart */}
+                        <div className="flex gap-1 mt-2">
+                          {(['Small', 'Medium', 'Large'] as DrinkSize[]).map((size) => (
+                            <button
+                              key={size}
+                              onClick={() => updateCartSize(item.menuitemid, item.size, size)}
+                              className={`px-2 py-1 text-xs rounded transition-colors ${
+                                item.size === size
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                       <button
-                        onClick={() => removeFromCart(item.menuitemid)}
+                        onClick={() => removeFromCart(item.menuitemid, item.size)}
                         className="text-red-500 hover:text-red-700 text-xl font-bold ml-2"
                         aria-label="Remove item"
                       >
@@ -489,14 +587,14 @@ function CustomerKioskLayout() {
                     </div>
                     <div className="flex items-center gap-3 mt-3">
                       <button
-                        onClick={() => updateCartQuantity(item.menuitemid, item.quantity - 1)}
+                        onClick={() => updateCartQuantity(item.menuitemid, item.size, item.quantity - 1)}
                         className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-lg flex items-center justify-center"
                       >
                         −
                       </button>
                       <span className="text-xl font-semibold w-12 text-center">{item.quantity}</span>
                       <button
-                        onClick={() => updateCartQuantity(item.menuitemid, item.quantity + 1)}
+                        onClick={() => updateCartQuantity(item.menuitemid, item.size, item.quantity + 1)}
                         className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-lg flex items-center justify-center"
                       >
                         +
