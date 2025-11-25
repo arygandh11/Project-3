@@ -7,13 +7,49 @@ import Button from './ui/Button';
 import Receipt from './Receipt';
 
 /**
+ * Available drink sizes
+ */
+type DrinkSize = 'Small' | 'Medium' | 'Large';
+
+/**
+ * Price multipliers for different sizes
+ */
+const SIZE_MULTIPLIERS: Record<DrinkSize, number> = {
+  'Small': 0.85,
+  'Medium': 1.0,
+  'Large': 1.25
+};
+
+/**
+ * Available toppings with their prices
+ */
+const AVAILABLE_TOPPINGS = [
+  { id: 'boba', name: 'Boba', price: 0.50 },
+  { id: 'lycheejelly', name: 'Lychee Jelly', price: 0.50 },
+  { id: 'grassjelly', name: 'Grass Jelly', price: 0.50 },
+  { id: 'pudding', name: 'Pudding', price: 0.75 },
+  { id: 'aloevera', name: 'Aloe Vera', price: 0.50 },
+  { id: 'redbean', name: 'Red Bean', price: 0.75 },
+  { id: 'coffeejelly', name: 'Coffee Jelly', price: 0.50 },
+  { id: 'coconutjelly', name: 'Coconut Jelly', price: 0.50 },
+  { id: 'chiaseeds', name: 'Chia Seeds', price: 0.50 },
+  { id: 'taroballs', name: 'Taro Balls', price: 0.75 },
+  { id: 'mangostars', name: 'Mango Stars', price: 0.75 },
+  { id: 'rainbowjelly', name: 'Rainbow Jelly', price: 0.50 },
+  { id: 'crystalboba', name: 'Crystal Boba', price: 0.75 },
+];
+
+/**
  * Cart item structure
  */
 interface CartItem {
   menuitemid: number;
   name: string;
+  basePrice: number;
   price: number;
   quantity: number;
+  size: DrinkSize;
+  toppings: string[]; // Array of topping IDs
 }
 
 /**
@@ -122,6 +158,8 @@ function CustomerKioskLayout() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showReceipt, setShowReceipt] = useState(false);
   const [isIdle, setIsIdle] = useState(false);
+  const [selectedSize, setSelectedSize] = useState<DrinkSize>('Medium');
+  const [selectedToppings, setSelectedToppings] = useState<string[]>([]);
   const [receiptData, setReceiptData] = useState<{
     orderNumber: number;
     items: Array<{ name: string; quantity: number; price: number }>;
@@ -225,14 +263,28 @@ function CustomerKioskLayout() {
   /**
    * Add item to cart
    * @param menuItem - Menu item to add
+   * @param size - Size of the drink
    */
-  const addToCart = (menuItem: MenuItem) => {
+  const addToCart = (menuItem: MenuItem, size: DrinkSize = selectedSize) => {
     resetIdleTimer(); // Reset idle timer on interaction
+    const toppings = [...selectedToppings];
+    const toppingPrice = toppings.reduce((sum, toppingId) => {
+      const topping = AVAILABLE_TOPPINGS.find(t => t.id === toppingId);
+      return sum + (topping?.price || 0);
+    }, 0);
+    const price = (menuItem.price * SIZE_MULTIPLIERS[size]) + toppingPrice;
+    
     setCart(prevCart => {
-      const existingItem = prevCart.find(item => item.menuitemid === menuItem.menuitemid);
+      const existingItem = prevCart.find(
+        item => item.menuitemid === menuItem.menuitemid && 
+                item.size === size && 
+                JSON.stringify(item.toppings.sort()) === JSON.stringify(toppings.sort())
+      );
       if (existingItem) {
         return prevCart.map(item =>
-          item.menuitemid === menuItem.menuitemid
+          item.menuitemid === menuItem.menuitemid && 
+          item.size === size && 
+          JSON.stringify(item.toppings.sort()) === JSON.stringify(toppings.sort())
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
@@ -240,26 +292,49 @@ function CustomerKioskLayout() {
       return [...prevCart, {
         menuitemid: menuItem.menuitemid,
         name: menuItem.menuitemname,
-        price: menuItem.price,
-        quantity: 1
+        basePrice: menuItem.price,
+        price: price,
+        quantity: 1,
+        size: size,
+        toppings: toppings
       }];
+    });
+    
+    // Clear topping selection after adding to cart
+    setSelectedToppings([]);
+  };
+
+  /**
+   * Toggle topping selection
+   * @param toppingId - Topping ID to toggle
+   */
+  const toggleTopping = (toppingId: string) => {
+    resetIdleTimer();
+    setSelectedToppings(prev => {
+      if (prev.includes(toppingId)) {
+        return prev.filter(id => id !== toppingId);
+      }
+      return [...prev, toppingId];
     });
   };
 
   /**
    * Update item quantity in cart
    * @param menuitemid - Menu item ID
+   * @param size - Size of the item
    * @param quantity - New quantity
    */
-  const updateCartQuantity = (menuitemid: number, quantity: number) => {
+  const updateCartQuantity = (menuitemid: number, size: DrinkSize, toppings: string[], quantity: number) => {
     resetIdleTimer(); // Reset idle timer on interaction
     if (quantity <= 0) {
-      removeFromCart(menuitemid);
+      removeFromCart(menuitemid, size, toppings);
       return;
     }
     setCart(prevCart =>
       prevCart.map(item =>
-        item.menuitemid === menuitemid
+        item.menuitemid === menuitemid && 
+        item.size === size && 
+        JSON.stringify(item.toppings.sort()) === JSON.stringify(toppings.sort())
           ? { ...item, quantity }
           : item
       )
@@ -267,12 +342,45 @@ function CustomerKioskLayout() {
   };
 
   /**
+   * Update item size in cart
+   * @param menuitemid - Menu item ID
+   * @param currentSize - Current size
+   * @param newSize - New size
+   */
+  const updateCartSize = (menuitemid: number, currentSize: DrinkSize, toppings: string[], newSize: DrinkSize) => {
+    resetIdleTimer(); // Reset idle timer on interaction
+    setCart(prevCart =>
+      prevCart.map(item => {
+        if (item.menuitemid === menuitemid && 
+            item.size === currentSize && 
+            JSON.stringify(item.toppings.sort()) === JSON.stringify(toppings.sort())) {
+          const toppingPrice = item.toppings.reduce((sum, toppingId) => {
+            const topping = AVAILABLE_TOPPINGS.find(t => t.id === toppingId);
+            return sum + (topping?.price || 0);
+          }, 0);
+          const newPrice = (item.basePrice * SIZE_MULTIPLIERS[newSize]) + toppingPrice;
+          return { ...item, size: newSize, price: newPrice };
+        }
+        return item;
+      })
+    );
+  };
+
+  /**
    * Remove item from cart
    * @param menuitemid - Menu item ID to remove
+   * @param size - Size of the item
+   * @param toppings - Toppings of the item
    */
-  const removeFromCart = (menuitemid: number) => {
+  const removeFromCart = (menuitemid: number, size: DrinkSize, toppings: string[]) => {
     resetIdleTimer(); // Reset idle timer on interaction
-    setCart(prevCart => prevCart.filter(item => item.menuitemid !== menuitemid));
+    setCart(prevCart => prevCart.filter(
+      item => !(
+        item.menuitemid === menuitemid && 
+        item.size === size && 
+        JSON.stringify(item.toppings.sort()) === JSON.stringify(toppings.sort())
+      )
+    ));
   };
 
   /**
@@ -312,7 +420,10 @@ function CustomerKioskLayout() {
         orderweek: getCurrentWeek(),
         orderItems: cart.map(item => ({
           menuitemid: item.menuitemid,
-          quantity: item.quantity
+          quantity: item.quantity,
+          size: item.size,
+          price: item.price,
+          toppings: item.toppings // Send toppings array to backend
         }))
       };
 
@@ -321,11 +432,21 @@ function CustomerKioskLayout() {
       // Prepare receipt data
       setReceiptData({
         orderNumber: result.orderid,
-        items: cart.map(item => ({
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price
-        })),
+        items: cart.map(item => {
+          let itemName = `${item.name} (${item.size})`;
+          if (item.toppings.length > 0) {
+            const toppingNames = item.toppings.map(id => {
+              const topping = AVAILABLE_TOPPINGS.find(t => t.id === id);
+              return topping?.name || id;
+            }).join(', ');
+            itemName += ` + ${toppingNames}`;
+          }
+          return {
+            name: itemName,
+            quantity: item.quantity,
+            price: item.price
+          };
+        }),
         total: cartTotal,
         timestamp: orderData.timeoforder
       });
@@ -422,6 +543,64 @@ function CustomerKioskLayout() {
             ))}
           </div>
 
+          {/* Size Selector */}
+          <div className="mb-6 bg-white border-2 border-purple-200 rounded-lg p-4">
+            <h3 className="text-lg font-semibold mb-3 text-gray-800">Select Size:</h3>
+            <div className="flex gap-3">
+              {(['Small', 'Medium', 'Large'] as DrinkSize[]).map((size) => (
+                <button
+                  key={size}
+                  onClick={() => {
+                    resetIdleTimer();
+                    setSelectedSize(size);
+                  }}
+                  className={`flex-1 px-4 py-3 rounded-lg text-lg font-medium transition-all ${
+                    selectedSize === size
+                      ? 'bg-purple-600 text-white shadow-lg scale-105'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <div>{size}</div>
+                  <div className="text-sm opacity-80">
+                    {size === 'Small' ? '-15%' : size === 'Large' ? '+25%' : 'Base'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Topping Selector */}
+          <div className="mb-6 bg-white border-2 border-purple-200 rounded-lg p-4">
+            <h3 className="text-lg font-semibold mb-3 text-gray-800">
+              Add Toppings: {selectedToppings.length > 0 && `(${selectedToppings.length} selected)`}
+            </h3>
+            <div className="grid grid-cols-3 gap-2">
+              {AVAILABLE_TOPPINGS.map((topping) => (
+                <button
+                  key={topping.id}
+                  onClick={() => toggleTopping(topping.id)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedToppings.includes(topping.id)
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <div>{topping.name}</div>
+                  <div className="text-xs opacity-80">+${topping.price.toFixed(2)}</div>
+                </button>
+              ))}
+            </div>
+            {selectedToppings.length > 0 && (
+              <div className="mt-3 text-sm text-gray-600">
+                Total toppings: +$
+                {selectedToppings.reduce((sum, id) => {
+                  const topping = AVAILABLE_TOPPINGS.find(t => t.id === id);
+                  return sum + (topping?.price || 0);
+                }, 0).toFixed(2)}
+              </div>
+            )}
+          </div>
+
           {/* Menu Items Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredMenuItems.length === 0 ? (
@@ -429,28 +608,34 @@ function CustomerKioskLayout() {
                 No items found in this category
               </div>
             ) : (
-              filteredMenuItems.map((item) => (
-                <div
-                  key={item.menuitemid}
-                  className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer"
-                  onClick={() => addToCart(item)}
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <h3 className="text-2xl font-bold text-gray-800">{item.menuitemname}</h3>
-                    <span className="text-xl font-bold text-purple-600">${item.price.toFixed(2)}</span>
-                  </div>
-                  <p className="text-gray-600 mb-4">{item.drinkcategory}</p>
-                  <button
-                    className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-purple-700 transition-colors"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      addToCart(item);
-                    }}
+              filteredMenuItems.map((item) => {
+                const priceForSize = item.price * SIZE_MULTIPLIERS[selectedSize];
+                return (
+                  <div
+                    key={item.menuitemid}
+                    className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-purple-400 hover:shadow-lg transition-all cursor-pointer"
+                    onClick={() => addToCart(item)}
                   >
-                    Add to Cart
-                  </button>
-                </div>
-              ))
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="text-2xl font-bold text-gray-800">{item.menuitemname}</h3>
+                      <div className="text-right">
+                        <span className="text-xl font-bold text-purple-600">${priceForSize.toFixed(2)}</span>
+                        <div className="text-sm text-gray-500">{selectedSize}</div>
+                      </div>
+                    </div>
+                    <p className="text-gray-600 mb-4">{item.drinkcategory}</p>
+                    <button
+                      className="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-purple-700 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToCart(item);
+                      }}
+                    >
+                      Add to Cart
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
@@ -469,18 +654,43 @@ function CustomerKioskLayout() {
               </div>
             ) : (
               <div className="space-y-4">
-                {cart.map((item) => (
+                {cart.map((item, index) => (
                   <div
-                    key={item.menuitemid}
+                    key={`${item.menuitemid}-${item.size}-${index}`}
                     className="bg-white rounded-lg p-4 shadow-sm border border-gray-200"
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="flex-1">
                         <h4 className="font-bold text-lg text-gray-800">{item.name}</h4>
                         <p className="text-gray-600 text-sm">${item.price.toFixed(2)} each</p>
+                        {item.toppings.length > 0 && (
+                          <p className="text-purple-600 text-xs mt-1">
+                            Toppings: {item.toppings.map(id => {
+                              const topping = AVAILABLE_TOPPINGS.find(t => t.id === id);
+                              return topping?.name;
+                            }).join(', ')}
+                          </p>
+                        )}
+                        
+                        {/* Size Selector in Cart */}
+                        <div className="flex gap-1 mt-2">
+                          {(['Small', 'Medium', 'Large'] as DrinkSize[]).map((size) => (
+                            <button
+                              key={size}
+                              onClick={() => updateCartSize(item.menuitemid, item.size, item.toppings, size)}
+                              className={`px-2 py-1 text-xs rounded transition-colors ${
+                                item.size === size
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                       <button
-                        onClick={() => removeFromCart(item.menuitemid)}
+                        onClick={() => removeFromCart(item.menuitemid, item.size, item.toppings)}
                         className="text-red-500 hover:text-red-700 text-xl font-bold ml-2"
                         aria-label="Remove item"
                       >
@@ -489,14 +699,14 @@ function CustomerKioskLayout() {
                     </div>
                     <div className="flex items-center gap-3 mt-3">
                       <button
-                        onClick={() => updateCartQuantity(item.menuitemid, item.quantity - 1)}
+                        onClick={() => updateCartQuantity(item.menuitemid, item.size, item.toppings, item.quantity - 1)}
                         className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-lg flex items-center justify-center"
                       >
                         −
                       </button>
                       <span className="text-xl font-semibold w-12 text-center">{item.quantity}</span>
                       <button
-                        onClick={() => updateCartQuantity(item.menuitemid, item.quantity + 1)}
+                        onClick={() => updateCartQuantity(item.menuitemid, item.size, item.toppings, item.quantity + 1)}
                         className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-lg flex items-center justify-center"
                       >
                         +
