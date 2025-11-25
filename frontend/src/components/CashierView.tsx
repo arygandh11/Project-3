@@ -21,6 +21,25 @@ const SIZE_MULTIPLIERS: Record<DrinkSize, number> = {
 };
 
 /**
+ * Available toppings with their prices
+ */
+const AVAILABLE_TOPPINGS = [
+  { id: 'boba', name: 'Boba', price: 0.50 },
+  { id: 'lycheejelly', name: 'Lychee Jelly', price: 0.50 },
+  { id: 'grassjelly', name: 'Grass Jelly', price: 0.50 },
+  { id: 'pudding', name: 'Pudding', price: 0.75 },
+  { id: 'aloevera', name: 'Aloe Vera', price: 0.50 },
+  { id: 'redbean', name: 'Red Bean', price: 0.75 },
+  { id: 'coffeejelly', name: 'Coffee Jelly', price: 0.50 },
+  { id: 'coconutjelly', name: 'Coconut Jelly', price: 0.50 },
+  { id: 'chiaseeds', name: 'Chia Seeds', price: 0.50 },
+  { id: 'taroballs', name: 'Taro Balls', price: 0.75 },
+  { id: 'mangostars', name: 'Mango Stars', price: 0.75 },
+  { id: 'rainbowjelly', name: 'Rainbow Jelly', price: 0.50 },
+  { id: 'crystalboba', name: 'Crystal Boba', price: 0.75 },
+];
+
+/**
  * Order item structure for the current order being built
  */
 interface OrderItem {
@@ -30,6 +49,7 @@ interface OrderItem {
   basePrice: number;
   price: number;
   size: DrinkSize;
+  toppings: string[];
 }
 
 /**
@@ -50,6 +70,7 @@ function CashierView() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [itemQuantities, setItemQuantities] = useState<Record<number, number>>({});
   const [itemSizes, setItemSizes] = useState<Record<number, DrinkSize>>({});
+  const [itemToppings, setItemToppings] = useState<Record<number, string[]>>({});
   const [customerName, setCustomerName] = useState('');
   const [currentOrder, setCurrentOrder] = useState<OrderItem[]>([]);
   const [incompleteOrders, setIncompleteOrders] = useState<OrderResponse[]>([]);
@@ -254,21 +275,28 @@ function CashierView() {
 
   /**
    * Add a menu item to the current order
-   * If the item already exists with the same size, increments its quantity instead of adding a duplicate
+   * If the item already exists with the same size and toppings, increments its quantity instead of adding a duplicate
    * @param menuItem - Menu item to add to the order
    */
   const addToOrder = (menuItem: MenuItem) => {
     const quantity = itemQuantities[menuItem.menuitemid] || 1;
     const size = itemSizes[menuItem.menuitemid] || 'Medium';
-    const price = menuItem.price * SIZE_MULTIPLIERS[size];
+    const toppings = itemToppings[menuItem.menuitemid] || [];
+    const toppingPrice = toppings.reduce((sum, toppingId) => {
+      const topping = AVAILABLE_TOPPINGS.find(t => t.id === toppingId);
+      return sum + (topping?.price || 0);
+    }, 0);
+    const price = (menuItem.price * SIZE_MULTIPLIERS[size]) + toppingPrice;
 
-    // Check if item already exists in order with the same size
+    // Check if item already exists in order with the same size and toppings
     const existingItemIndex = currentOrder.findIndex(
-      item => item.menuitemid === menuItem.menuitemid && item.size === size
+      item => item.menuitemid === menuItem.menuitemid && 
+              item.size === size &&
+              JSON.stringify(item.toppings.sort()) === JSON.stringify(toppings.sort())
     );
 
     if (existingItemIndex >= 0) {
-      // Update quantity if item already exists with same size
+      // Update quantity if item already exists with same size and toppings
       const updatedOrder = [...currentOrder];
       updatedOrder[existingItemIndex].quantity += quantity;
       setCurrentOrder(updatedOrder);
@@ -280,10 +308,29 @@ function CashierView() {
         name: menuItem.menuitemname,
         basePrice: menuItem.price,
         price: price,
-        size: size
+        size: size,
+        toppings: toppings
       };
       setCurrentOrder([...currentOrder, orderItem]);
     }
+    
+    // Clear topping selection after adding
+    setItemToppings(prev => ({ ...prev, [menuItem.menuitemid]: [] }));
+  };
+
+  /**
+   * Toggle topping selection for a menu item
+   * @param menuitemid - Menu item ID
+   * @param toppingId - Topping ID to toggle
+   */
+  const toggleTopping = (menuitemid: number, toppingId: string) => {
+    setItemToppings(prev => {
+      const currentToppings = prev[menuitemid] || [];
+      if (currentToppings.includes(toppingId)) {
+        return { ...prev, [menuitemid]: currentToppings.filter(id => id !== toppingId) };
+      }
+      return { ...prev, [menuitemid]: [...currentToppings, toppingId] };
+    });
   };
 
   /**
@@ -336,7 +383,8 @@ function CashierView() {
           menuitemid: item.menuitemid,
           quantity: item.quantity,
           size: item.size,
-          price: item.price
+          price: item.price,
+          toppings: item.toppings
         }))
       };
 
@@ -345,11 +393,21 @@ function CashierView() {
       // Prepare receipt data
       setReceiptData({
         orderNumber: result.orderid,
-        items: currentOrder.map(item => ({
-          name: `${item.name} (${item.size})`,
-          quantity: item.quantity,
-          price: item.price
-        })),
+        items: currentOrder.map(item => {
+          let itemName = `${item.name} (${item.size})`;
+          if (item.toppings.length > 0) {
+            const toppingNames = item.toppings.map(id => {
+              const topping = AVAILABLE_TOPPINGS.find(t => t.id === id);
+              return topping?.name || id;
+            }).join(', ');
+            itemName += ` + ${toppingNames}`;
+          }
+          return {
+            name: itemName,
+            quantity: item.quantity,
+            price: item.price
+          };
+        }),
         total: getTotal(),
         timestamp: orderData.timeoforder
       });
@@ -434,40 +492,70 @@ function CashierView() {
                   .map((item) => (
                   <div
                     key={item.menuitemid}
-                    className="p-3 border-b border-gray-200 flex items-center gap-4"
+                    className="p-3 border-b border-gray-200"
                   >
-                    <div className="flex-1 text-sm">
-                      <div>{item.menuitemname}</div>
-                      <div className="text-xs text-gray-600">
-                        ${(item.price * SIZE_MULTIPLIERS[itemSizes[item.menuitemid] || 'Medium']).toFixed(2)}
+                    <div className="flex items-center gap-4 mb-2">
+                      <div className="flex-1 text-sm">
+                        <div>{item.menuitemname}</div>
+                        <div className="text-xs text-gray-600">
+                          ${(() => {
+                            const basePrice = item.price * SIZE_MULTIPLIERS[itemSizes[item.menuitemid] || 'Medium'];
+                            const toppingPrice = (itemToppings[item.menuitemid] || []).reduce((sum, toppingId) => {
+                              const topping = AVAILABLE_TOPPINGS.find(t => t.id === toppingId);
+                              return sum + (topping?.price || 0);
+                            }, 0);
+                            return (basePrice + toppingPrice).toFixed(2);
+                          })()}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs">Size:</label>
+                        <select
+                          value={itemSizes[item.menuitemid] || 'Medium'}
+                          onChange={(e) => updateItemSize(item.menuitemid, e.target.value as DrinkSize)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-1.5 border border-gray-300 text-xs w-[70px] bg-white"
+                        >
+                          <option value="Small">S</option>
+                          <option value="Medium">M</option>
+                          <option value="Large">L</option>
+                        </select>
+                        <label className="text-xs">Qty:</label>
+                        <select
+                          value={itemQuantities[item.menuitemid] || 1}
+                          onChange={(e) => updateItemQuantity(item.menuitemid, parseInt(e.target.value))}
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-1.5 border border-gray-300 text-xs w-[60px] bg-white"
+                        >
+                          {Array.from({ length: 10 }, (_, i) => i + 1).map(num => (
+                            <option key={num} value={num}>{num}</option>
+                          ))}
+                        </select>
+                        <Button onClick={() => addToOrder(item)} size="sm" className="text-xs">
+                          Add
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs">Size:</label>
-                      <select
-                        value={itemSizes[item.menuitemid] || 'Medium'}
-                        onChange={(e) => updateItemSize(item.menuitemid, e.target.value as DrinkSize)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1.5 border border-gray-300 text-xs w-[70px] bg-white"
-                      >
-                        <option value="Small">S</option>
-                        <option value="Medium">M</option>
-                        <option value="Large">L</option>
-                      </select>
-                      <label className="text-xs">Qty:</label>
-                      <select
-                        value={itemQuantities[item.menuitemid] || 1}
-                        onChange={(e) => updateItemQuantity(item.menuitemid, parseInt(e.target.value))}
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-1.5 border border-gray-300 text-xs w-[60px] bg-white"
-                      >
-                        {Array.from({ length: 10 }, (_, i) => i + 1).map(num => (
-                          <option key={num} value={num}>{num}</option>
+                    {/* Topping Selector */}
+                    <div className="ml-0">
+                      <div className="text-xs text-gray-600 mb-1">
+                        Toppings {(itemToppings[item.menuitemid] || []).length > 0 && `(${(itemToppings[item.menuitemid] || []).length})`}:
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {AVAILABLE_TOPPINGS.map((topping) => (
+                          <button
+                            key={topping.id}
+                            onClick={() => toggleTopping(item.menuitemid, topping.id)}
+                            className={`px-2 py-1 rounded text-xs transition-colors ${
+                              (itemToppings[item.menuitemid] || []).includes(topping.id)
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {topping.name} +${topping.price.toFixed(2)}
+                          </button>
                         ))}
-                      </select>
-                      <Button onClick={() => addToOrder(item)} size="sm" className="text-xs">
-                        Add
-                      </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -486,6 +574,14 @@ function CashierView() {
               currentOrder.map((item, index) => (
                 <div key={index} className="p-2 border-b border-gray-200">
                   <div>{item.name} ({item.size})</div>
+                  {item.toppings.length > 0 && (
+                    <div className="text-xs text-purple-600">
+                      + {item.toppings.map(id => {
+                        const topping = AVAILABLE_TOPPINGS.find(t => t.id === id);
+                        return topping?.name || id;
+                      }).join(', ')}
+                    </div>
+                  )}
                   <div className="text-xs text-gray-600">x{item.quantity} - ${(item.price * item.quantity).toFixed(2)}</div>
                 </div>
               ))

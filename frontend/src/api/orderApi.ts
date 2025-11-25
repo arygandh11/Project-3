@@ -51,6 +51,7 @@ export interface OrderItemDetail {
   size: string;
   menuitemname: string;
   price: number;
+  toppings?: string; // Optional comma-separated list of topping IDs
 }
 
 /**

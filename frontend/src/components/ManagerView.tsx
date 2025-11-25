@@ -14,6 +14,25 @@ import ZReport from './reports/ZReport';
 import SalesReport from './reports/SalesReport';
 
 /**
+ * Available toppings with their prices
+ */
+const AVAILABLE_TOPPINGS = [
+  { id: 'boba', name: 'Boba', price: 0.50 },
+  { id: 'lycheejelly', name: 'Lychee Jelly', price: 0.50 },
+  { id: 'grassjelly', name: 'Grass Jelly', price: 0.50 },
+  { id: 'pudding', name: 'Pudding', price: 0.75 },
+  { id: 'aloevera', name: 'Aloe Vera', price: 0.50 },
+  { id: 'redbean', name: 'Red Bean', price: 0.75 },
+  { id: 'coffeejelly', name: 'Coffee Jelly', price: 0.50 },
+  { id: 'coconutjelly', name: 'Coconut Jelly', price: 0.50 },
+  { id: 'chiaseeds', name: 'Chia Seeds', price: 0.50 },
+  { id: 'taroballs', name: 'Taro Balls', price: 0.75 },
+  { id: 'mangostars', name: 'Mango Stars', price: 0.75 },
+  { id: 'rainbowjelly', name: 'Rainbow Jelly', price: 0.50 },
+  { id: 'crystalboba', name: 'Crystal Boba', price: 0.75 },
+];
+
+/**
  * Manager View component
  * Dashboard for managers with four main tabs:
  * - Inventory: View, add, and update raw ingredient inventory items
@@ -1448,13 +1467,16 @@ function ManagerView() {
                                         <tr className="bg-gray-50 border-b border-gray-200">
                                           <th className="p-2 text-left text-xs font-bold">Drink Name</th>
                                           <th className="p-2 text-left text-xs font-bold">Size</th>
+                                          <th className="p-2 text-left text-xs font-bold">Toppings</th>
                                           <th className="p-2 text-left text-xs font-bold">Quantity</th>
                                           <th className="p-2 text-left text-xs font-bold">Price</th>
                                           <th className="p-2 text-left text-xs font-bold">Subtotal</th>
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {orderItems[order.orderid].map((item) => (
+                                        {orderItems[order.orderid].map((item) => {
+                                          const toppings = item.toppings ? item.toppings.split(',').filter(t => t.trim()) : [];
+                                          return (
                                           <tr key={item.orderitemid} className="border-b border-gray-100 last:border-0">
                                             <td className="p-2 text-xs">{item.menuitemname}</td>
                                             <td className="p-2 text-xs">
@@ -1462,13 +1484,29 @@ function ManagerView() {
                                                 {item.size}
                                               </span>
                                             </td>
+                                            <td className="p-2 text-xs">
+                                              {toppings.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1">
+                                                  {toppings.map((toppingId, idx) => {
+                                                    const topping = AVAILABLE_TOPPINGS.find(t => t.id === toppingId.trim());
+                                                    return (
+                                                      <span key={idx} className="px-1.5 py-0.5 bg-green-100 text-green-800 rounded text-xs">
+                                                        {topping?.name || toppingId}
+                                                      </span>
+                                                    );
+                                                  })}
+                                                </div>
+                                              ) : (
+                                                <span className="text-gray-400">None</span>
+                                              )}
+                                            </td>
                                             <td className="p-2 text-xs">{item.quantity}</td>
                                             <td className="p-2 text-xs">${Number(item.price).toFixed(2)}</td>
                                             <td className="p-2 text-xs font-semibold">
                                               ${(Number(item.price) * item.quantity).toFixed(2)}
                                             </td>
                                           </tr>
-                                        ))}
+                                        );})}
                                       </tbody>
                                     </table>
                                   </div>
